@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+app/dist/
+app/src-tauri/target/
+app/src-tauri/gen/
+
+# Env files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+
+# Rust
+*.rs.bk
+
+# Tauri
+app/src-tauri/WixTools/
+
+# 临时
+.alma/
