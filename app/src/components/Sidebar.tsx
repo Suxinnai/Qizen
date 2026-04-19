@@ -30,7 +30,6 @@ const NAV_ITEMS: NavItem[] = [
 export function Sidebar() {
   return (
     <aside className="qz-sidebar">
-      {/* Logo */}
       <div className="flex items-center gap-2 px-2 pt-1 pb-4">
         <Leaf size={26} stroke="#2D7A6B" />
         <span className="font-serif text-[20px] tracking-wide text-qz-primary dark:text-qz-light">
@@ -38,7 +37,6 @@ export function Sidebar() {
         </span>
       </div>
 
-      {/* 菜单 */}
       <nav className="flex flex-col gap-1">
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
@@ -59,7 +57,6 @@ export function Sidebar() {
 
       <div className="flex-1" />
 
-      {/* 用户信息 */}
       <div className="flex items-center gap-3 px-2 py-3 border-t border-black/5 dark:border-white/5">
         <div className="relative">
           <div

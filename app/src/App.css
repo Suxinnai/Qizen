@@ -2,7 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ───────── 全局基底 ───────── */
 :root {
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -25,7 +24,6 @@ body {
   overflow: hidden;
 }
 
-/* ───────── 栖知主窗口（铺满，不留外边） ───────── */
 .qz-window {
   @apply bg-qz-card dark:bg-qz-bg-dark;
   height: 100vh;
@@ -35,7 +33,6 @@ body {
   overflow: hidden;
 }
 
-/* ───────── 标题栏 ───────── */
 .qz-titlebar {
   height: 36px;
   display: flex;
@@ -61,7 +58,6 @@ body {
   cursor: pointer;
 }
 
-/* ───────── 毛玻璃侧栏 ───────── */
 .qz-sidebar {
   width: 220px;
   background: rgba(250, 248, 244, 0.6);
@@ -80,7 +76,6 @@ body {
   border-color: rgba(255, 255, 255, 0.06);
 }
 
-/* ───────── 侧栏菜单项 ───────── */
 .qz-nav-item {
   @apply flex items-center gap-2 px-3 py-2 rounded-md text-[13px] cursor-pointer transition-colors;
   color: theme("colors.qz.text");
@@ -100,7 +95,6 @@ body {
   font-weight: 500;
 }
 
-/* ───────── 卡片 ───────── */
 .qz-card {
   @apply bg-qz-card dark:bg-qz-card-dark rounded-qz shadow-qz-card transition-all duration-200;
   border: 0.5px solid rgba(0, 0, 0, 0.06);
@@ -114,12 +108,10 @@ body {
   transform: translateY(-1px);
 }
 
-/* ───────── 噪点纹理 ───────── */
 .qz-noise {
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/><feColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.04 0'/></filter><rect width='200' height='200' filter='url(%23n)'/></svg>");
 }
 
-/* ───────── 滚动条（macOS 风） ───────── */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -141,7 +133,6 @@ body {
   background: rgba(255, 255, 255, 0.25);
 }
 
-/* ───────── 浮动「灵」入口 - 优雅版 ───────── */
 .qz-ling-float {
   position: fixed;
   bottom: 28px;
@@ -184,7 +175,6 @@ body {
   50% { transform: scale(1.15); opacity: 0.8; }
 }
 
-/* hover 时显示 tooltip */
 .qz-ling-float .qz-ling-tip {
   position: absolute;
   right: calc(100% + 12px);
