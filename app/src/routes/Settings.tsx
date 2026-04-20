@@ -1,17 +1,46 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { loadAppData, modeLabel, resetOnboarding, updateSettings } from "../lib/storage";
+
+import { testLlmConnection } from "../lib/llm";
+import {
+  getStudyInteractionCount,
+  loadAppData,
+  modeLabel,
+  resetOnboarding,
+  updateSettings,
+  type LlmProviderType,
+} from "../lib/storage";
+
+type ConnectionStatus =
+  | { kind: "idle" }
+  | { kind: "testing" }
+  | { kind: "success"; message: string }
+  | { kind: "error"; message: string };
 
 export default function Settings() {
   const navigate = useNavigate();
   const initial = useMemo(() => loadAppData(), []);
   const [settings, setSettings] = useState(initial.settings);
+  const [studyInteractionCount] = useState(getStudyInteractionCount(initial));
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>({ kind: "idle" });
   const profile = initial.learningProfile;
 
   function patch<K extends keyof typeof settings>(key: K, value: (typeof settings)[K]) {
     const next = { ...settings, [key]: value };
     setSettings(next);
+    setConnectionStatus({ kind: "idle" });
     updateSettings({ [key]: value } as Partial<typeof settings>);
+  }
+
+  async function handleTestConnection() {
+    if (connectionStatus.kind === "testing") return;
+    setConnectionStatus({ kind: "testing" });
+    const result = await testLlmConnection(settings.llm);
+    if (result.ok) {
+      setConnectionStatus({ kind: "success", message: `连接成功：${result.providerLabel} 可用` });
+      return;
+    }
+    setConnectionStatus({ kind: "error", message: result.errorSummary ?? "连接失败，请检查配置" });
   }
 
   return (
@@ -126,8 +155,85 @@ export default function Settings() {
               />
             </label>
 
-            <div className="rounded-md border border-dashed border-black/10 dark:border-white/10 px-4 py-4 text-[12px] text-qz-text-muted">
-              当前版本已持久化保存：学习画像、目标/任务、笔记、偏好设置。后续会继续补资料库与学习空间的数据闭环。
+            <div className="space-y-4 rounded-qz border border-black/5 dark:border-white/5 p-4">
+              <div>
+                <div className="font-serif text-[18px] text-qz-text-strong dark:text-qz-text-dark mb-1">模型与 API</div>
+                <div className="text-[12px] text-qz-text-muted">Study 会优先用这里配置的模型来结合资料库回答，失败时再回退到本地回答。</div>
+              </div>
+
+              <label className="block">
+                <div className="text-[13px] mb-2">Provider</div>
+                <select
+                  value={settings.llm.provider}
+                  onChange={(e) => patch("llm", { ...settings.llm, provider: e.target.value as LlmProviderType })}
+                  className="w-full rounded-md border border-black/10 dark:border-white/10 bg-transparent px-3 py-2 text-[13px] outline-none"
+                >
+                  <option value="none">未配置</option>
+                  <option value="openai-compatible">OpenAI Compatible</option>
+                  <option value="anthropic">Anthropic Claude</option>
+                </select>
+              </label>
+
+              {settings.llm.provider === "openai-compatible" ? (
+                <label className="block">
+                  <div className="text-[13px] mb-2">Base URL</div>
+                  <input
+                    value={settings.llm.baseUrl}
+                    onChange={(e) => patch("llm", { ...settings.llm, baseUrl: e.target.value })}
+                    placeholder="https://api.openai.com/v1"
+                    className="w-full rounded-md border border-black/10 dark:border-white/10 bg-transparent px-3 py-2 text-[13px] outline-none"
+                  />
+                </label>
+              ) : null}
+
+              <label className="block">
+                <div className="text-[13px] mb-2">Model</div>
+                <input
+                  value={settings.llm.model}
+                  onChange={(e) => patch("llm", { ...settings.llm, model: e.target.value })}
+                  placeholder={settings.llm.provider === "anthropic" ? "claude-3-5-sonnet-latest" : "gpt-4o-mini"}
+                  className="w-full rounded-md border border-black/10 dark:border-white/10 bg-transparent px-3 py-2 text-[13px] outline-none"
+                />
+              </label>
+
+              <label className="block">
+                <div className="text-[13px] mb-2">API Key</div>
+                <input
+                  type="password"
+                  value={settings.llm.apiKey}
+                  onChange={(e) => patch("llm", { ...settings.llm, apiKey: e.target.value })}
+                  placeholder="输入后仅保存在本地"
+                  className="w-full rounded-md border border-black/10 dark:border-white/10 bg-transparent px-3 py-2 text-[13px] outline-none"
+                />
+              </label>
+
+              <div className="space-y-3">
+                <div className="rounded-md border border-dashed border-black/10 dark:border-white/10 px-3 py-3 text-[12px] text-qz-text-muted">
+                  当前状态：{settings.llm.provider !== "none" && settings.llm.apiKey && settings.llm.model ? "已配置模型，可用于真实回答" : "未完整配置，将使用本地回答"}
+                </div>
+
+                <div className="flex items-center gap-3 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={handleTestConnection}
+                    disabled={connectionStatus.kind === "testing"}
+                    className="px-4 py-2 rounded-md bg-qz-primary text-white text-[12px] hover:bg-qz-dark transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {connectionStatus.kind === "testing" ? "测试中..." : "测试连接"}
+                  </button>
+                  {connectionStatus.kind === "success" ? (
+                    <div className="text-[12px] text-emerald-700 dark:text-emerald-300">{connectionStatus.message}</div>
+                  ) : null}
+                  {connectionStatus.kind === "error" ? (
+                    <div className="text-[12px] text-rose-700 dark:text-rose-300">连接失败：{connectionStatus.message}</div>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-md border border-dashed border-black/10 dark:border-white/10 px-4 py-4 text-[12px] text-qz-text-muted space-y-2">
+              <div>当前已记录学习交互：{studyInteractionCount} 次</div>
+              <div>当前版本已持久化保存：学习画像、目标/任务、笔记、偏好设置、模型配置、学习交互记录。后续会继续补资料库与学习空间的数据闭环。</div>
             </div>
           </div>
         </div>
