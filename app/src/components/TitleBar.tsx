@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Sun, Moon, Bell } from "lucide-react";
 import clsx from "clsx";
@@ -87,7 +87,20 @@ interface TitleBarProps {
   onToggleTheme: () => void;
 }
 
+function formatNow(date: Date) {
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
 export function TitleBar({ title, isDark, onToggleTheme }: TitleBarProps) {
+  const [nowText, setNowText] = useState(() => formatNow(new Date()));
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNowText(formatNow(new Date()));
+    }, 1000 * 30);
+    return () => window.clearInterval(timer);
+  }, []);
+
   return (
     <div className="qz-titlebar" data-tauri-drag-region>
       <div data-tauri-drag-region={false}>
@@ -105,6 +118,10 @@ export function TitleBar({ title, isDark, onToggleTheme }: TitleBarProps) {
         className="ml-auto flex items-center gap-1"
         data-tauri-drag-region={false}
       >
+        <div className="h-7 min-w-[68px] px-2.5 rounded-full border border-black/5 dark:border-white/8 bg-white/60 dark:bg-white/[0.04] flex items-center justify-center text-[11px] font-medium text-qz-text-muted">
+          {nowText}
+        </div>
+        <div id="qz-titlebar-study-slot" className="flex items-center mr-1" />
         <button
           type="button"
           aria-label="切换主题"

@@ -39,6 +39,15 @@ export interface AppSettings {
   pomodoroMinutes: number;
   preferredStyle: TeachingStyle;
   remindersEnabled: boolean;
+  autoStartPomodoro: boolean;
+  autoAppendNote: boolean;
+  autoGenerateSessionTitle: boolean;
+  autoSummarizeSessionNote: boolean;
+  autoUpdateLearningProfile: boolean;
+  requireTerminalConfirmation: "always" | "never";
+  contextWindowRounds: number;
+  ragSimilarityThreshold: number;
+  searchCacheHours: number;
   llm: LlmProviderConfig;
 }
 
@@ -221,6 +230,15 @@ const defaultSettings: AppSettings = {
   pomodoroMinutes: 25,
   preferredStyle: "analogy",
   remindersEnabled: true,
+  autoStartPomodoro: true,
+  autoAppendNote: true,
+  autoGenerateSessionTitle: true,
+  autoSummarizeSessionNote: false,
+  autoUpdateLearningProfile: true,
+  requireTerminalConfirmation: "always",
+  contextWindowRounds: 10,
+  ragSimilarityThreshold: 0.75,
+  searchCacheHours: 24,
   llm: {
     provider: "none",
     apiKey: "",

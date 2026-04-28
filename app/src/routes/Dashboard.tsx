@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CheckCircle2, Circle, Clock } from "lucide-react";
+import { BarChart3, CheckCircle2, Circle, Clock } from "lucide-react";
 import { motion } from "framer-motion";
 import clsx from "clsx";
 import { Leaf } from "../components/icons/Leaf";
@@ -153,6 +153,26 @@ function RhythmCard({ data }: { data: AppData }) {
   );
 }
 
+function ReportsEntryCard() {
+  const navigate = useNavigate();
+  return (
+    <div className="qz-card flex items-center justify-between gap-4">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-full bg-qz-primary/10 flex items-center justify-center text-qz-primary">
+          <BarChart3 size={17} />
+        </div>
+        <div>
+          <div className="font-serif text-[18px] text-qz-text-strong dark:text-qz-text-dark">学习报告</div>
+          <div className="text-[12px] text-qz-text-muted mt-1">查看最近提问、资料命中和 fallback 情况</div>
+        </div>
+      </div>
+      <button type="button" onClick={() => navigate("/reports")} className="px-4 py-2 rounded-full bg-qz-primary text-white text-[12px] hover:bg-qz-dark transition-colors">
+        查看报告
+      </button>
+    </div>
+  );
+}
+
 function ReviewCard() {
   const navigate = useNavigate();
 
@@ -202,6 +222,7 @@ export default function Dashboard() {
           <RhythmCard data={data} />
         </div>
         <ReviewCard />
+        <ReportsEntryCard />
         <div className="h-16" />
       </div>
     </div>

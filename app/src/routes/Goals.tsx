@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import clsx from "clsx";
 import { ChevronDown, ChevronRight, Target } from "lucide-react";
 import { loadAppData } from "../lib/storage";
 
 export default function Goals() {
+  const navigate = useNavigate();
   const data = useMemo(() => loadAppData(), []);
   const [selectedGoalId, setSelectedGoalId] = useState(data.goals[0]?.id ?? "");
 
@@ -82,12 +84,21 @@ export default function Goals() {
                   </div>
                   <div className="px-4 py-4 space-y-3">
                     {milestone.tasks.map((task) => (
-                      <div key={task.id} className="flex items-center justify-between rounded-md border border-black/5 dark:border-white/5 px-3 py-3">
-                        <div>
+                      <div key={task.id} className="flex items-center justify-between gap-3 rounded-md border border-black/5 dark:border-white/5 px-3 py-3">
+                        <div className="min-w-0">
                           <div className="text-[13px] text-qz-text-strong dark:text-qz-text-dark">{task.title}</div>
                           <div className="text-[11px] text-qz-text-muted mt-1">{task.meta}</div>
                         </div>
-                        <span className={clsx("text-[12px] px-2 py-1 rounded-full", task.done ? "bg-qz-mastered/15 text-qz-primary" : "bg-black/5 dark:bg-white/5 text-qz-text-muted")}>{task.done ? "已完成" : "待学习"}</span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className={clsx("text-[12px] px-2 py-1 rounded-full", task.done ? "bg-qz-mastered/15 text-qz-primary" : "bg-black/5 dark:bg-white/5 text-qz-text-muted")}>{task.done ? "已完成" : "待学习"}</span>
+                          <button
+                            type="button"
+                            onClick={() => navigate("/study", { state: { source: "goal", taskId: task.id } })}
+                            className="text-[12px] px-3 py-1.5 rounded-full bg-qz-primary/10 text-qz-primary hover:bg-qz-primary/15 transition-colors"
+                          >
+                            去学习
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>

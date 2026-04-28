@@ -7,6 +7,8 @@ import Library from "./routes/Library";
 import Graph from "./routes/Graph";
 import Notes from "./routes/Notes";
 import Settings from "./routes/Settings";
+import Profile from "./routes/Profile";
+import Reports from "./routes/Reports";
 import Onboarding from "./routes/Onboarding";
 import { loadAppData } from "./lib/storage";
 import "./App.css";
@@ -42,6 +44,8 @@ export default function App() {
             <Route path="/graph" element={<Graph />} />
             <Route path="/notes" element={<Notes />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/reports" element={<Reports />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Route>
         </Route>

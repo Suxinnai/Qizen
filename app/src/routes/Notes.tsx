@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Copy, Download, Sparkles } from "lucide-react";
 import { loadAppData, updateNote } from "../lib/storage";
 
 export default function Notes() {
+  const navigate = useNavigate();
   const initialData = useMemo(() => loadAppData(), []);
   const [notes, setNotes] = useState(initialData.notes);
   const [selectedId, setSelectedId] = useState(initialData.notes[0]?.id ?? "");
@@ -45,6 +47,13 @@ export default function Notes() {
                   <p className="font-serif italic text-[14px] text-qz-text-muted mt-2">手抄一遍，胜读十遍</p>
                 </div>
                 <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => navigate("/study", { state: { source: "note", noteId: selected.id } })}
+                    className="px-3 py-2 rounded-md bg-qz-primary text-white text-[12px] flex items-center gap-2 hover:bg-qz-dark"
+                  >
+                    带去学习空间
+                  </button>
                   <button className="px-3 py-2 rounded-md border border-black/10 dark:border-white/10 text-[12px] flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5"><Download size={14} />导出</button>
                   <button className="px-3 py-2 rounded-md border border-black/10 dark:border-white/10 text-[12px] flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5"><Copy size={14} />复制到 Anki</button>
                 </div>

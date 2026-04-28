@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import {
-  ChevronDown,
-  Circle,
-  CheckCircle2,
   Paperclip,
   Mic,
   SendHorizonal,
@@ -13,17 +10,15 @@ import {
   BookMarked,
   Network,
   X,
-  Sparkles,
 } from "lucide-react";
 import clsx from "clsx";
-import { Leaf } from "../components/icons/Leaf";
 import {
   appendStudySessionEvent,
   getStudyInteractionCount,
   loadAppData,
   modeLabel,
+  toggleTask,
   updateNote,
-  updateSettings,
   type TeachingStyle,
   type GoalTask,
   type AppData,
@@ -35,7 +30,29 @@ import {
   type LibraryRagResult,
   type RagPracticeSet,
 } from "../lib/rag";
-import { generateStudyAnswer } from "../lib/llm";
+import { MessageBody } from "../components/study/MessageBody";
+import { StrategyBar } from "../components/study/StrategyBar";
+import { StudyEmptyState } from "../components/study/StudyEmptyState";
+import { isNonLearningChat, shouldSearchKnowledgeBase } from "../lib/study/intent";
+import {
+  collectHitResourceTitles,
+  createEmptyRag,
+  getStrongRag,
+  scoreLabel,
+  shouldDisplayRagEvidence,
+} from "../lib/study/rag-policy";
+import { generateStudyAnswer, generateStudyConversationTitle, sanitizeLlmText } from "../lib/llm";
+import {
+  buildStudyConversationTitle,
+  createStudyConversation,
+  sanitizePersistedText,
+  getActiveStudyConversationId,
+  getStudyConversation,
+  getStudyConversationChangeEventName,
+  setActiveStudyConversationId,
+  upsertStudyConversation,
+  type PersistedStudyConversation,
+} from "../lib/studyConversations";
 import type { PracticeQuestionEvidence } from "../lib/storage";
 
 type MessageRole = "assistant" | "user";
@@ -53,9 +70,11 @@ interface ChatMessage {
 }
 
 interface StudyLocationState {
-  source?: "library" | "graph";
+  source?: "library" | "graph" | "goal" | "note";
   resourceId?: string;
   nodeId?: string;
+  taskId?: string;
+  noteId?: string;
 }
 
 const STYLE_LABELS: Record<TeachingStyle, string> = {
@@ -84,10 +103,12 @@ const RESOURCES = [
 
 const PANEL_META: Record<PanelKey, { label: string; icon: typeof Timer; hint: string }> = {
   pomodoro: { label: "专注计时", icon: Timer, hint: "灵建议你先专注一段" },
-  resource: { label: "灵找到的", icon: BookMarked, hint: "灵翻到了几条不错的资源" },
+  resource: { label: "资料与依据", icon: BookMarked, hint: "当前资料、命中依据和补充资源会显示在这里" },
   note: { label: "AI 整理的笔记", icon: NotebookPen, hint: "灵帮你把这一段整理好了" },
   graph: { label: "你在哪里", icon: Network, hint: "你正在知识图谱的这个位置" },
 };
+
+const FLOATING_PANEL_KEYS: PanelKey[] = ["pomodoro", "resource", "note", "graph"];
 
 function getStudyTree(data: AppData) {
   return data.goals.find((goal) => goal.id === "goal-math") ?? data.goals[0];
@@ -97,7 +118,16 @@ function flattenTasks(data: AppData): GoalTask[] {
   return data.goals.flatMap((goal) => goal.milestones.flatMap((milestone) => milestone.tasks));
 }
 
-function buildInitialMessages(style: TeachingStyle, resourceTitle?: string, nodeLabel?: string): ChatMessage[] {
+function buildInitialMessages(
+  style: TeachingStyle,
+  resourceTitle?: string,
+  nodeLabel?: string,
+  isFreeConversation = false
+): ChatMessage[] {
+  if (isFreeConversation) {
+    return [];
+  }
+
   if (resourceTitle) {
     return [
       {
@@ -106,34 +136,20 @@ function buildInitialMessages(style: TeachingStyle, resourceTitle?: string, node
         content:
           `我已经把《${resourceTitle}》带进来了。` +
           (nodeLabel ? `它现在主要挂在「${nodeLabel}」这个知识点上。` : "") +
-          `\n\n接下来我会优先用资料库里的内容来回答你，尽量把解释建立在你自己的资料上。`,
+          `\n\n接下来我会优先用资料库里的内容来回答你；如果资料没命中，我也会继续走大模型的通用解释，不会只卡在资料库里。`,
         triggers: ["graph", "resource"],
       },
       {
         id: "m2",
         role: "assistant",
         content:
-          `当前讲解风格是${STYLE_LABELS[style]}。你现在可以直接追问概念、条件、例子、证明思路，我会先检索你带进来的资料，再补充解释。`,
+          `当前讲解风格是${STYLE_LABELS[style]}。你现在可以直接追问概念、条件、例子、证明思路，也可以随时新开一个学习会话换题。`,
         triggers: ["resource"],
       },
     ];
   }
 
-  return [
-    { id: "m1", role: "assistant", content: "你可以直接提问，我会先在资料库里找依据，再根据命中的内容来解释。" },
-    {
-      id: "m2",
-      role: "assistant",
-      content: `当前默认按${STYLE_LABELS[style]}来讲。如果资料里证据不够，我也会明确告诉你不确定。`,
-      triggers: ["resource", "graph"],
-    },
-  ];
-}
-
-function scoreLabel(score: number) {
-  if (score >= 20) return "高相关";
-  if (score >= 10) return "中相关";
-  return "弱相关";
+  return [];
 }
 
 function buildEvidenceLine(match: LibraryRagMatch) {
@@ -228,12 +244,7 @@ function PracticePanel({ practice }: { practice: RagPracticeSet | null }) {
   const [expandedQuestionIds, setExpandedQuestionIds] = useState<string[]>([]);
 
   if (!practice) {
-    return (
-      <div className="mt-4 rounded-[18px] border border-[#E8A93C]/30 bg-[#E8A93C]/8 px-4 py-4 text-[12px] text-qz-text-muted leading-6">
-        <div className="font-medium text-[#B47F1C] mb-1">还没有可用的命中资料</div>
-        <div>请先提一个问题，或者先从资料库带着资料进入 Study。只有检索到了明确资料，才能基于命中内容出题。</div>
-      </div>
-    );
+    return null;
   }
 
   return (
@@ -297,12 +308,17 @@ function PracticePanel({ practice }: { practice: RagPracticeSet | null }) {
 function buildAssistantReply(params: {
   query: string;
   style: TeachingStyle;
-  profileText: string;
   selectedResourceTitle?: string;
   selectedNodeLabel?: string;
   rag: LibraryRagResult;
 }) {
-  const { query, style, profileText, selectedResourceTitle, selectedNodeLabel, rag } = params;
+  const { query, style, selectedResourceTitle, selectedNodeLabel, rag } = params;
+  if (isNonLearningChat(query)) {
+    return [
+      "我是栖知学习空间里的 AI 学习助手，主要负责陪你拆知识点、找资料依据、整理笔记、安排练习和推进学习路径。",
+      "这类问题不会触发资料库检索，所以我不会把无关资料硬塞成依据。你可以直接问我一个知识点，或者从目标、资料库、笔记里带上下文进来学。",
+    ].join("\n\n");
+  }
   const top = rag.results[0];
   const contextLead = selectedResourceTitle
     ? `我先按你当前带入的《${selectedResourceTitle}》来回答`
@@ -310,9 +326,9 @@ function buildAssistantReply(params: {
 
   if (!top) {
     return [
-      `${contextLead}。不过这次没有检索到足够相关的本地资料。`,
-      `资料库没有明确依据，以下解释可能不够准确。基于你当前的${profileText}，我先用${STYLE_LABELS[style]}方式给你一个尽量稳妥的说明：${STYLE_RESPONSES[style]}`,
-      `如果你愿意，可以继续补充问题里的关键词${selectedNodeLabel ? `，或者围绕「${selectedNodeLabel}」再问得更具体一些` : ""}，我会重新检索。`,
+      `${contextLead}，但这次没有检索到能直接支撑「${query}」的本地资料片段。`,
+      "按学习空间的设计，没命中资料时本来应该继续走大模型的通用知识回答，而不是被资料库卡死。",
+      `所以在当前这个兜底分支里，我不应该硬套固定话术来答你。${selectedNodeLabel ? `如果你其实是在继续学「${selectedNodeLabel}」，可以把问题问得更具体一点；` : ""}你也可以直接新开一个学习会话换题。`,
     ].join("\n\n");
   }
 
@@ -342,13 +358,9 @@ function buildAssistantReply(params: {
 }
 
 function RagEvidenceCard({ rag }: { rag: LibraryRagResult }) {
-  if (rag.results.length === 0) {
-    return (
-      <div className="mt-4 rounded-[18px] border border-[#E8A93C]/30 bg-[#E8A93C]/8 px-4 py-4 text-[12px] text-qz-text-muted leading-6">
-        <div className="font-medium text-[#B47F1C] mb-1">本次未检索到明确资料依据</div>
-        <div>资料库没有明确依据，以下解释可能不够准确。建议换一个更具体的问题，或者先从 Library / Graph 带着资料进入学习空间。</div>
-      </div>
-    );
+  const displayRag = getStrongRag(rag);
+  if (!shouldDisplayRagEvidence(displayRag)) {
+    return null;
   }
 
   return (
@@ -357,16 +369,16 @@ function RagEvidenceCard({ rag }: { rag: LibraryRagResult }) {
         <div>
           <div className="text-[12px] text-qz-primary font-medium">RAG 证据</div>
           <div className="text-[11px] text-qz-text-muted mt-0.5">
-            {rag.sufficient ? "以下内容是本次回答优先参考的本地资料" : "已找到部分资料，但依据强度一般，请结合原文判断"}
+            以下内容是本次回答优先参考的本地资料
           </div>
         </div>
         <span className="text-[10px] px-2 py-1 rounded-full bg-white/80 dark:bg-black/15 text-qz-text-muted">
-          Top {rag.results.length}
+          Top {displayRag.results.length}
         </span>
       </div>
 
       <div className="space-y-3">
-        {rag.results.map((match) => (
+        {displayRag.results.map((match) => (
           <div key={match.resource.id} className="rounded-[14px] border border-black/[0.05] dark:border-white/[0.06] bg-white/70 dark:bg-black/10 px-3.5 py-3">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -402,66 +414,41 @@ function RagEvidenceCard({ rag }: { rag: LibraryRagResult }) {
   );
 }
 
-function MessageBody({ content }: { content: string }) {
-  const paragraphs = content.split("\n\n").filter(Boolean);
-  return (
-    <div className="space-y-3">
-      {paragraphs.map((paragraph, index) => (
-        <p key={`${index}-${paragraph.slice(0, 8)}`} className="leading-[1.85]">
-          {paragraph}
-        </p>
-      ))}
-    </div>
-  );
-}
-
-function collectHitResourceTitles(rag: LibraryRagResult | null) {
-  return rag?.results.map((match) => match.resource.title) ?? [];
-}
-
-function StrategyBar({ onSwitchStyle }: { onSwitchStyle: () => void }) {
-  return (
-    <div className="mt-4 flex flex-wrap gap-2 text-[12px]">
-      <button
-        type="button"
-        onClick={onSwitchStyle}
-        className="px-3 py-1.5 rounded-full bg-qz-primary/10 text-qz-primary hover:bg-qz-primary/15 transition-colors"
-      >
-        换种讲法
-      </button>
-      <button type="button" className="px-3 py-1.5 rounded-full bg-black/[0.04] dark:bg-white/[0.06] text-qz-text-muted hover:bg-black/[0.06] dark:hover:bg-white/[0.1] transition-colors">
-        更深入
-      </button>
-      <button type="button" className="px-3 py-1.5 rounded-full bg-black/[0.04] dark:bg-white/[0.06] text-qz-text-muted hover:bg-black/[0.06] dark:hover:bg-white/[0.1] transition-colors">
-        我懂了
-      </button>
-      <button type="button" className="px-3 py-1.5 rounded-full bg-black/[0.04] dark:bg-white/[0.06] text-qz-text-muted hover:bg-black/[0.06] dark:hover:bg-white/[0.1] transition-colors">
-        给我一个例子
-      </button>
-    </div>
-  );
-}
-
 export default function Study() {
   const location = useLocation();
-  const data = useMemo(() => loadAppData(), []);
+  const [data, setData] = useState(() => loadAppData());
   const goal = getStudyTree(data);
   const tasks = flattenTasks(data);
   const initialStyle = data.settings.preferredStyle;
   const locationState = (location.state ?? null) as StudyLocationState | null;
-  const selectedResource = locationState?.resourceId
-    ? data.libraryItems.find((item) => item.id === locationState.resourceId)
+  const routeContext = useMemo<StudyLocationState | null>(() => {
+    if (!locationState?.resourceId && !locationState?.nodeId && !locationState?.taskId && !locationState?.noteId) return null;
+    return {
+      source: locationState?.source,
+      resourceId: locationState?.resourceId,
+      nodeId: locationState?.nodeId,
+      taskId: locationState?.taskId,
+      noteId: locationState?.noteId,
+    };
+  }, [locationState?.source, locationState?.resourceId, locationState?.nodeId, locationState?.taskId, locationState?.noteId]);
+  const routeContextKey = `${location.key ?? "study"}:${routeContext?.source ?? ""}:${routeContext?.resourceId ?? ""}:${routeContext?.nodeId ?? ""}:${routeContext?.taskId ?? ""}:${routeContext?.noteId ?? ""}`;
+
+  const [conversationContext, setConversationContext] = useState<StudyLocationState | null>(routeContext);
+  const selectedResource = conversationContext?.resourceId
+    ? data.libraryItems.find((item) => item.id === conversationContext.resourceId)
     : undefined;
-  const selectedNode = locationState?.nodeId
-    ? data.knowledgeGraph.nodes.find((node) => node.id === locationState.nodeId)
+  const selectedNode = conversationContext?.nodeId
+    ? data.knowledgeGraph.nodes.find((node) => node.id === conversationContext.nodeId)
     : selectedResource?.linkedNodeIds?.[0]
     ? data.knowledgeGraph.nodes.find((node) => node.id === selectedResource.linkedNodeIds[0])
     : undefined;
+  const selectedNote = conversationContext?.noteId
+    ? data.notes.find((note) => note.id === conversationContext.noteId)
+    : undefined;
 
-  const [teachingStyle, setTeachingStyle] = useState<TeachingStyle>(initialStyle);
-  const [messages, setMessages] = useState<ChatMessage[]>(() =>
-    buildInitialMessages(initialStyle, selectedResource?.title, selectedNode?.label)
-  );
+  const [teachingStyle] = useState<TeachingStyle>(initialStyle);
+  const [isFreeConversation, setIsFreeConversation] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [selectedTaskId, setSelectedTaskId] = useState<string>(
     goal?.milestones?.[0]?.tasks?.[0]?.id ?? tasks[0]?.id ?? ""
   );
@@ -469,15 +456,24 @@ export default function Study() {
   const [pomodoroRunning, setPomodoroRunning] = useState(false);
   const [noteDraft, setNoteDraft] = useState(() => data.notes[0]?.content ?? "");
   const [input, setInput] = useState("");
-  const [planOpen, setPlanOpen] = useState(false);
-  const [activePanel, setActivePanel] = useState<PanelKey | null>(selectedResource ? "resource" : null);
+  const [activePanel, setActivePanel] = useState<PanelKey | null>(null);
   const [autoTriggered, setAutoTriggered] = useState<Set<string>>(new Set());
   const [latestRag, setLatestRag] = useState<LibraryRagResult | null>(null);
   const [practiceSet, setPracticeSet] = useState<RagPracticeSet | null>(null);
   const [practiceHint, setPracticeHint] = useState<string>("");
   const [isGeneratingAnswer, setIsGeneratingAnswer] = useState(false);
-  const [studyInteractionCount, setStudyInteractionCount] = useState(getStudyInteractionCount(data));
-  const planRef = useRef<HTMLDivElement>(null);
+  const [conversationTitle, setConversationTitle] = useState<string | null>(null);
+  const [activeConversationId, setActiveConversationIdState] = useState<string | null>(() => getActiveStudyConversationId());
+  const [, setStudyInteractionCount] = useState(getStudyInteractionCount(data));
+  const activeConversationIdRef = useRef(activeConversationId);
+  const activeConversationHydratedRef = useRef(false);
+  const skipNextConversationSyncRef = useRef(false);
+  const contextSyncRef = useRef(false);
+  const hydratedConversationRef = useRef(false);
+
+  useEffect(() => {
+    activeConversationIdRef.current = activeConversationId;
+  }, [activeConversationId]);
 
   const selectedTask = tasks.find((task) => task.id === selectedTaskId) ?? tasks[0];
   const profileText = data.learningProfile
@@ -486,20 +482,29 @@ export default function Study() {
   const activeMilestone = goal?.milestones.find((milestone) =>
     milestone.tasks.some((task) => task.id === selectedTaskId)
   );
-  const learningGoal = selectedResource
-    ? `围绕《${selectedResource.title}》继续学习${selectedNode ? ` · ${selectedNode.label}` : ""}`
+  const baseLearningGoal = isFreeConversation
+    ? "自由学习会话"
+    : selectedResource
+    ? selectedResource.title
+    : selectedNote
+    ? selectedNote.title
+    : selectedTask?.title ?? "当前任务";
+  const learningGoal = conversationTitle?.trim() || baseLearningGoal;
+  const completedToday = tasks.filter((task) => task.done).length;
+  const sessionSummaryText = isFreeConversation
+    ? "你可以直接换题，不受上一轮对话限制"
+    : selectedResource
+    ? selectedNode
+      ? `${selectedNode.label} · ${selectedResource.summary}`
+      : selectedResource.summary
     : activeMilestone?.title.includes("微分中值定理")
     ? "理解拉格朗日中值定理及其几何意义"
     : activeMilestone
     ? "理解" + activeMilestone.title.replace(/^第\s*\d+\s*章\s*/, "")
-    : "完成" + (selectedTask?.title ?? "当前任务");
-  const completedToday = tasks.filter((task) => task.done).length;
-  const headerGoalLabel = selectedResource ? "当前学习主线" : "今天目标";
+    : selectedTask?.meta ?? `今日完成 ${completedToday}/${tasks.length}`;
   const totalSeconds = data.settings.pomodoroMinutes * 60;
   const pomodoroProgress =
     totalSeconds > 0 ? Math.max(0, Math.min(1, 1 - pomodoroSeconds / totalSeconds)) : 0;
-  const dashLength = 50.27;
-  const dashOffset = dashLength * (1 - pomodoroProgress);
 
   useEffect(() => {
     if (!pomodoroRunning) return;
@@ -512,17 +517,6 @@ export default function Study() {
   useEffect(() => {
     if (pomodoroSeconds === 0) setPomodoroRunning(false);
   }, [pomodoroSeconds]);
-
-  useEffect(() => {
-    if (!planOpen) return;
-    function onClick(e: MouseEvent) {
-      if (planRef.current && !planRef.current.contains(e.target as Node)) {
-        setPlanOpen(false);
-      }
-    }
-    window.addEventListener("mousedown", onClick);
-    return () => window.removeEventListener("mousedown", onClick);
-  }, [planOpen]);
 
   useEffect(() => {
     const last = messages[messages.length - 1];
@@ -538,74 +532,253 @@ export default function Study() {
     });
   }, [messages, autoTriggered]);
 
-  function switchStyle() {
-    const order: TeachingStyle[] = ["analogy", "logic", "story", "steps"];
-    const currentIndex = order.indexOf(teachingStyle);
-    const nextStyle = order[(currentIndex + 1) % order.length];
-    setTeachingStyle(nextStyle);
-    updateSettings({ preferredStyle: nextStyle });
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: "m-" + Date.now(),
-        role: "assistant",
-        content: "好，我换成" + STYLE_LABELS[nextStyle] + "来讲。\n\n" + STYLE_RESPONSES[nextStyle],
-      },
-    ]);
+  function buildConversationSnapshot(override?: Partial<PersistedStudyConversation>): PersistedStudyConversation {
+    const snapshotMessages = (override?.messages as ChatMessage[] | undefined) ?? messages;
+    const snapshotContext = override?.context ?? conversationContext;
+    const snapshotIsFreeConversation = override?.isFreeConversation ?? isFreeConversation;
+    const snapshotSelectedTaskId = override?.selectedTaskId ?? selectedTaskId;
+    const snapshotNoteDraft = override?.noteDraft ?? noteDraft;
+    const firstUserMessage = sanitizeLlmText(snapshotMessages.find((message) => message.role === "user")?.content ?? "");
+    const firstAssistantMessage = sanitizeLlmText(snapshotMessages.find((message) => message.role === "assistant")?.content ?? "");
+    const title = buildStudyConversationTitle({
+      manualTitle: override?.title ?? conversationTitle ?? undefined,
+      selectedTaskTitle: baseLearningGoal,
+      resourceTitle: selectedResource?.title,
+      firstUserMessage,
+      firstAssistantMessage,
+      isFreeConversation: snapshotIsFreeConversation,
+    });
+
+    return {
+      id: activeConversationId ?? `study-conv-${Date.now()}`,
+      title,
+      createdAt: override?.createdAt ?? new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      isFreeConversation: snapshotIsFreeConversation,
+      context: snapshotContext,
+      selectedTaskId: snapshotSelectedTaskId,
+      teachingStyle,
+      noteDraft: snapshotNoteDraft,
+      messages: snapshotMessages,
+    };
+  }
+
+  function persistCurrentConversation(override?: Partial<PersistedStudyConversation>) {
+    const snapshot = buildConversationSnapshot(override);
+    const saved = activeConversationId ? upsertStudyConversation(snapshot) : createStudyConversation(snapshot);
+    setConversationTitle(sanitizeLlmText(saved.title));
+    activeConversationIdRef.current = saved.id;
+    activeConversationHydratedRef.current = true;
+    skipNextConversationSyncRef.current = true;
+    setActiveConversationIdState(saved.id);
+    setActiveStudyConversationId(saved.id);
+    return saved;
+  }
+
+  function resetStudySession(next: { context?: StudyLocationState | null; freeMode?: boolean } = {}) {
+    const nextContext = next.context === undefined ? conversationContext : next.context;
+    const nextResource = nextContext?.resourceId
+      ? data.libraryItems.find((item) => item.id === nextContext.resourceId)
+      : undefined;
+    const nextNode = nextContext?.nodeId
+      ? data.knowledgeGraph.nodes.find((node) => node.id === nextContext.nodeId)
+      : nextResource?.linkedNodeIds?.[0]
+      ? data.knowledgeGraph.nodes.find((node) => node.id === nextResource.linkedNodeIds[0])
+      : undefined;
+    const freeMode = next.freeMode ?? false;
+
+    setConversationContext(nextContext);
+    setIsFreeConversation(freeMode);
+    setMessages(buildInitialMessages(teachingStyle, nextResource?.title, nextNode?.label, true));
+    setLatestRag(null);
+    setPracticeSet(null);
+    setPracticeHint("");
+    setInput("");
+    setIsGeneratingAnswer(false);
+    setAutoTriggered(new Set());
+    setActivePanel(null);
+  }
+
+  useEffect(() => {
+    if (!contextSyncRef.current) {
+      contextSyncRef.current = true;
+      return;
+    }
+    resetStudySession({ context: routeContext, freeMode: false });
+  }, [routeContextKey]);
+
+  useEffect(() => {
+    const sync = () => {
+      const nextId = getActiveStudyConversationId();
+      if (skipNextConversationSyncRef.current && nextId === activeConversationIdRef.current) {
+        skipNextConversationSyncRef.current = false;
+        return;
+      }
+      if (nextId === activeConversationIdRef.current && activeConversationHydratedRef.current) return;
+      activeConversationIdRef.current = nextId;
+      setActiveConversationIdState(nextId);
+      if (!nextId) {
+        activeConversationHydratedRef.current = true;
+        return;
+      }
+      const conversation = getStudyConversation(nextId);
+      if (!conversation) return;
+      activeConversationHydratedRef.current = true;
+      hydratedConversationRef.current = true;
+      setConversationTitle(conversation.title);
+      setConversationContext(conversation.context);
+      setIsFreeConversation(conversation.isFreeConversation);
+      setSelectedTaskId(conversation.context?.taskId ?? conversation.selectedTaskId);
+      setMessages(
+        (conversation.messages as ChatMessage[]).map((message) => ({
+          ...message,
+          content: sanitizePersistedText(message.content),
+        }))
+      );
+      setNoteDraft(conversation.noteDraft);
+      setInput("");
+      setLatestRag(null);
+      setPracticeSet(null);
+      setPracticeHint("");
+      setIsGeneratingAnswer(false);
+      setAutoTriggered(new Set());
+      setActivePanel(null);
+    };
+
+    const handleNew = () => {
+      activeConversationIdRef.current = null;
+      activeConversationHydratedRef.current = true;
+      skipNextConversationSyncRef.current = true;
+      setActiveStudyConversationId(null);
+      setActiveConversationIdState(null);
+      setConversationTitle(null);
+      resetStudySession({ context: null, freeMode: true });
+    };
+
+    sync();
+    window.addEventListener(getStudyConversationChangeEventName(), sync);
+    window.addEventListener("qizen-study-start-new", handleNew);
+    return () => {
+      window.removeEventListener(getStudyConversationChangeEventName(), sync);
+      window.removeEventListener("qizen-study-start-new", handleNew);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!messages.length) return;
+    if (!hydratedConversationRef.current && messages.every((message) => message.role === "assistant")) return;
+    hydratedConversationRef.current = true;
+    persistCurrentConversation();
+  }, [messages, noteDraft, selectedTaskId, conversationContext, isFreeConversation]);
+
+  function shouldGenerateAiTitle(nextMessages: ChatMessage[]) {
+    if (!data.settings.autoGenerateSessionTitle) return false;
+    const genericTitle = !conversationTitle || conversationTitle === baseLearningGoal || /^新的/.test(conversationTitle);
+    const userMessageCount = nextMessages.filter((message) => message.role === "user").length;
+    return genericTitle && userMessageCount === 1;
+  }
+
+  async function refreshConversationTitle(nextMessages: ChatMessage[]) {
+    if (!shouldGenerateAiTitle(nextMessages)) return;
+    const aiTitle = await generateStudyConversationTitle({
+      providerConfig: data.settings.llm,
+      selectedResourceTitle: selectedResource?.title,
+      messages: nextMessages
+        .filter((message) => message.role === "user")
+        .slice(0, 2)
+        .map((message) => ({ role: message.role, content: sanitizeLlmText(message.content) })),
+    });
+    if (!aiTitle) return;
+    const cleanTitle = sanitizeLlmText(aiTitle);
+    setConversationTitle(cleanTitle);
+    persistCurrentConversation({ title: cleanTitle, messages: nextMessages });
+  }
+
+  function handleUnderstood() {
+    if (!selectedTaskId) return;
+    if (!selectedTask?.done) {
+      const nextData = toggleTask(selectedTaskId);
+      setData(nextData);
+    }
+    const taskTitle = selectedTask?.title ?? learningGoal;
+    const message: ChatMessage = {
+      id: `a-understood-${Date.now()}`,
+      role: "assistant",
+      content: `好，已把「${taskTitle}」标记为已掌握。下一步我会把你推到后续节点，别刚会一点就开始飘，主人。`,
+      triggers: ["graph"],
+    };
+    setMessages((prev) => [...prev, message]);
+    setActivePanel("graph");
   }
 
   async function sendMessage() {
     const text = input.trim();
     if (!text || isGeneratingAnswer) return;
 
-    const triggerHints: PanelKey[] = ["resource"];
-    if (text.includes("笔记") || text.includes("整理")) triggerHints.push("note");
-    if (text.includes("练习") || text.includes("做题") || text.includes("专注")) triggerHints.push("pomodoro");
-    if (text.includes("节点") || text.includes("图谱") || text.includes("前置")) triggerHints.push("graph");
+    const rawRag = shouldSearchKnowledgeBase(text)
+      ? retrieveRelevantLibraryContext(data, text, {
+          resourceId: selectedResource?.id,
+          nodeId: selectedNode?.id,
+          topK: 3,
+          minScore: Math.max(1.5, data.settings.ragSimilarityThreshold * 3.5),
+        })
+      : createEmptyRag(text);
+    const rag = getStrongRag(rawRag);
+    const hasHits = rag.results.length > 0;
 
-    const rag = retrieveRelevantLibraryContext(data, text, {
-      resourceId: selectedResource?.id,
-      nodeId: selectedNode?.id,
-      topK: 3,
-    });
+    const triggerHints: PanelKey[] = [];
+    if (hasHits) triggerHints.push("resource");
+    if (data.settings.autoAppendNote && (text.includes("笔记") || text.includes("整理"))) triggerHints.push("note");
+    if (data.settings.autoStartPomodoro && (text.includes("练习") || text.includes("做题") || text.includes("专注"))) triggerHints.push("pomodoro");
+    if (text.includes("节点") || text.includes("图谱") || text.includes("前置")) triggerHints.push("graph");
 
     const userMessage: ChatMessage = { id: "u-" + Date.now(), role: "user", content: text };
     setMessages((prev) => [...prev, userMessage]);
-    setLatestRag(rag);
+    setLatestRag(hasHits ? rag : null);
     setPracticeSet(null);
     setPracticeHint("");
     setInput("");
     setIsGeneratingAnswer(true);
 
-    const llmResult = await generateStudyAnswer({
-      query: text,
-      rag,
-      style: teachingStyle,
-      profileText,
-      selectedResourceTitle: selectedResource?.title,
-      selectedNodeLabel: selectedNode?.label,
-      providerConfig: data.settings.llm,
-    });
+    const isLocalIntent = isNonLearningChat(text);
+    const shouldUseModelForAnswer = !isLocalIntent;
+    const llmResult = shouldUseModelForAnswer
+      ? await generateStudyAnswer({
+          query: text,
+          rag,
+          style: teachingStyle,
+          profileText,
+          selectedResourceTitle: selectedResource?.title,
+          selectedNodeLabel: selectedNode?.label,
+          providerConfig: data.settings.llm,
+        })
+      : {
+          answer: "",
+          usedFallback: true,
+          providerLabel: "本地回答",
+          errorSummary: undefined,
+        };
 
     const fallbackContent = buildAssistantReply({
       query: text,
       style: teachingStyle,
-      profileText,
       selectedResourceTitle: selectedResource?.title,
       selectedNodeLabel: selectedNode?.label,
       rag,
     });
 
-    const assistantContent = llmResult.usedFallback
-      ? `${fallbackContent}\n\n${llmResult.errorSummary ? `（已回退到本地回答：${llmResult.errorSummary}）` : "（当前未使用真实模型，已回退到本地回答。）"}`
-      : llmResult.answer;
+    const assistantContent = sanitizeLlmText(
+      llmResult.usedFallback
+        ? `${fallbackContent}\n\n${llmResult.errorSummary ? `（已回退到本地回答：${llmResult.errorSummary}）` : "（当前未使用真实模型，已回退到本地回答。）"}`
+        : llmResult.answer
+    );
 
     const assistantMessage: ChatMessage = {
       id: "a-" + (Date.now() + 1),
       role: "assistant",
       content: assistantContent,
       triggers: triggerHints.length ? Array.from(new Set(triggerHints)) : undefined,
-      rag,
+      rag: hasHits ? rag : undefined,
       providerLabel: llmResult.providerLabel,
       usedFallback: llmResult.usedFallback,
       errorSummary: llmResult.errorSummary,
@@ -626,9 +799,22 @@ export default function Study() {
         usedFallback: llmResult.usedFallback,
       },
     });
+    const nextMessages = [...messages, userMessage, assistantMessage];
+
+    if (data.settings.autoAppendNote && triggerHints.includes("note")) {
+      const firstNote = data.notes[0];
+      const noteBlock = `\n\n## ${learningGoal}\n${assistantContent}`;
+      setNoteDraft((prev) => {
+        const next = prev.trim() ? `${prev.trimEnd()}${noteBlock}` : noteBlock.trim();
+        if (firstNote) updateNote(firstNote.id, next);
+        return next;
+      });
+    }
+
     setStudyInteractionCount((prev) => prev + 1);
     setMessages((prev) => [...prev, assistantMessage]);
     setIsGeneratingAnswer(false);
+    void refreshConversationTitle(nextMessages);
   }
 
   function generatePracticeFromLatestRag() {
@@ -641,7 +827,7 @@ export default function Study() {
 
     const nextPracticeSet = createPracticeSetFromRagResult(latestRag);
     if (!nextPracticeSet) {
-      setPracticeHint("当前命中资料还不足以生成题目，请换一个更具体的问题再试。\n\n资料库没有明确依据，以下解释可能不够准确。");
+      setPracticeHint("当前命中资料还不足以生成质量稳定的题目，请换一个更具体的问题再试。");
       return;
     }
 
@@ -672,220 +858,48 @@ export default function Study() {
     return String(minutes).padStart(2, "0") + ":" + String(seconds).padStart(2, "0");
   }
 
-  function selectTask(id: string) {
-    setSelectedTaskId(id);
-    setPlanOpen(false);
-  }
-
   return (
     <div className="h-full overflow-hidden bg-qz-bg dark:bg-qz-bg-dark flex flex-col relative">
-      <header className="px-8 pt-5 pb-4 relative z-20">
-        <div className="flex items-center gap-4 rounded-[26px] border border-black/[0.05] dark:border-white/[0.08] bg-white/78 dark:bg-white/[0.03] px-5 py-3 shadow-[0_18px_40px_-28px_rgba(45,122,107,0.28)]">
-          <div className="min-w-0 flex flex-1 items-center gap-4">
-            <div ref={planRef} className="relative shrink-0">
-              <button
-                type="button"
-                onClick={() => setPlanOpen((v) => !v)}
-                className={clsx(
-                  "h-10 pl-3.5 pr-3 rounded-full flex items-center gap-2 text-[12.5px] font-medium transition-all border shadow-sm",
-                  planOpen
-                    ? "bg-qz-primary/10 border-qz-primary/25 text-qz-primary"
-                    : "bg-white/88 dark:bg-white/[0.04] border-black/[0.06] dark:border-white/[0.08] text-qz-text-strong dark:text-qz-text-dark hover:border-qz-primary/25"
-                )}
-              >
-                <Leaf size={13} stroke="currentColor" />
-                <span className="max-w-[180px] truncate">{selectedTask?.title ?? "选择任务"}</span>
-                <ChevronDown size={13} className={clsx("transition-transform", planOpen && "rotate-180")} />
-              </button>
-
-              {planOpen ? (
-                <div
-                  className="absolute top-[48px] left-0 w-[320px] rounded-[16px] bg-white dark:bg-qz-card-dark border border-black/[0.06] dark:border-white/[0.08] py-3 z-30"
-                  style={{ boxShadow: "0 12px 40px -12px rgba(45,122,107,0.25), 0 4px 16px -4px rgba(0,0,0,0.06)" }}
-                >
-                  <div className="px-4 pb-3 border-b border-black/[0.05] dark:border-white/[0.06] flex items-center justify-between">
-                    <div>
-                      <div className="font-serif text-[15px] text-qz-text-strong dark:text-qz-text-dark">学习计划</div>
-                      <div className="text-[11px] text-qz-text-muted mt-0.5">挑一个，灵今天就教这个</div>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-[11px] text-qz-text-muted">
-                      <Sparkles size={11} className="text-qz-light" />
-                      <span>{profileText}</span>
-                    </div>
-                  </div>
-
-                  <div className="max-h-[420px] overflow-y-auto px-2 pt-2">
-                    {goal ? (
-                      <div className="px-2 pb-2">
-                        <div className="flex items-center gap-2 text-[12px] text-qz-text-muted px-2 py-1.5">
-                          <span className="font-medium text-qz-text-strong dark:text-qz-text-dark">{goal.title}</span>
-                          <span>·</span>
-                          <span>今日 {completedToday}/{tasks.length}</span>
-                        </div>
-                        {goal.milestones.map((milestone) => (
-                          <div key={milestone.id} className="mt-2">
-                            <div className="text-[11px] text-qz-text-muted px-2 mb-1">{milestone.title}</div>
-                            <div className="space-y-0.5">
-                              {milestone.tasks.map((task) => {
-                                const active = task.id === selectedTaskId;
-                                return (
-                                  <button
-                                    key={task.id}
-                                    type="button"
-                                    onClick={() => selectTask(task.id)}
-                                    className={clsx(
-                                      "w-full text-left rounded-[10px] px-2.5 py-2 transition-colors flex items-start gap-2",
-                                      active
-                                        ? "bg-qz-primary/10 text-qz-primary"
-                                        : "hover:bg-black/[0.04] dark:hover:bg-white/[0.05] text-qz-text-strong dark:text-qz-text-dark"
-                                    )}
-                                  >
-                                    {task.done ? (
-                                      <CheckCircle2 size={13} className="text-qz-primary mt-[3px] shrink-0" />
-                                    ) : (
-                                      <Circle size={13} className="text-qz-text-muted mt-[3px] shrink-0" />
-                                    )}
-                                    <span className="text-[12.5px] leading-[1.55]">{task.title}</span>
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
+      <header className="px-8 pt-3 pb-1 relative z-20">
+        <div className="max-w-[1240px] mx-auto flex items-center gap-3">
+          <div className="min-w-0 flex-1 hidden lg:block">
+            <div className="truncate text-[14px] font-medium text-qz-text-strong dark:text-qz-text-dark">
+              {learningGoal}
             </div>
-
-            <div className="hidden lg:block h-9 w-px bg-black/[0.06] dark:bg-white/[0.08]" />
-
-            <div className="min-w-0 flex-1">
-              <div className="text-[10px] text-qz-text-muted mb-1">{headerGoalLabel}</div>
-              <div className="truncate pr-2 text-[13px] text-qz-text-strong dark:text-qz-text-dark">
-                {learningGoal}
-              </div>
+            <div className="mt-0.5 truncate text-[11px] text-qz-text-muted">
+              {sessionSummaryText}
             </div>
           </div>
 
-          <div className="shrink-0 flex items-center gap-3">
-            <div className="hidden xl:flex items-center gap-2 rounded-full border border-black/[0.06] dark:border-white/[0.08] bg-white/88 dark:bg-white/[0.04] px-3 py-2 text-[11px] text-qz-text-muted shadow-sm">
-              <span>学习交互</span>
-              <span className="text-qz-text-strong dark:text-qz-text-dark font-medium">{studyInteractionCount}</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setPomodoroRunning((v) => !v)}
-              title={pomodoroRunning ? "点击暂停" : "点击开始"}
-              className={clsx(
-                "flex items-center gap-2 h-10 pl-3 pr-3.5 rounded-full border shadow-sm transition-all bg-white/88 dark:bg-white/[0.04]",
-                pomodoroRunning
-                  ? "border-qz-primary/25 bg-qz-primary/6 text-qz-primary"
-                  : "border-black/[0.06] dark:border-white/[0.08] text-qz-text-muted hover:border-qz-primary/25"
-              )}
-            >
-              <span className="relative w-5 h-5 shrink-0">
-                <svg viewBox="0 0 20 20" className="w-5 h-5 -rotate-90">
-                  <circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" strokeWidth="2" className="opacity-20" />
-                  <circle
-                    cx="10"
-                    cy="10"
-                    r="8"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeDasharray={dashLength}
-                    strokeDashoffset={dashOffset}
-                    className="transition-all duration-500"
-                  />
-                </svg>
-              </span>
-              <span className="font-mono text-[12px] tabular-nums">{formatTime(pomodoroSeconds)}</span>
-            </button>
-
-            <select
-              value={teachingStyle}
-              onChange={(e) => {
-                const next = e.target.value as TeachingStyle;
-                setTeachingStyle(next);
-                updateSettings({ preferredStyle: next });
-              }}
-              className="h-10 min-w-[168px] rounded-full border border-black/[0.06] dark:border-white/[0.08] bg-white/88 dark:bg-white/[0.04] px-4 text-[12.5px] font-medium outline-none hover:border-qz-primary/25 transition-colors shadow-sm"
-            >
-              {Object.entries(STYLE_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  教学风格 · {label}
-                </option>
-              ))}
-            </select>
-
-            <div className="h-7 w-px bg-black/[0.06] dark:bg-white/[0.08]" />
-
-            <div className="flex items-center gap-1 rounded-full border border-black/[0.06] dark:border-white/[0.08] bg-white/88 dark:bg-white/[0.04] p-1 shadow-sm">
-              {(Object.keys(PANEL_META) as PanelKey[]).map((key) => {
-                const meta = PANEL_META[key];
-                const Icon = meta.icon;
-                const active = activePanel === key;
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setActivePanel(active ? null : key)}
-                    title={meta.label}
-                    className={clsx(
-                      "w-9 h-9 rounded-full border border-transparent flex items-center justify-center transition-all",
-                      active
-                        ? "bg-qz-primary/10 text-qz-primary border-qz-primary/15 shadow-sm"
-                        : "text-qz-text-muted hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
-                    )}
-                  >
-                    <Icon size={14} />
-                  </button>
-                );
-              })}
-            </div>
-          </div>
         </div>
       </header>
 
       <div className="flex-1 min-h-0 flex relative">
         <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto px-10">
-            <div className="max-w-[760px] mx-auto py-8 space-y-7">
+          <div className="flex-1 overflow-y-auto px-8 lg:px-10">
+            <div className="max-w-[900px] mx-auto py-7 space-y-8">
+              {messages.length === 0 ? <StudyEmptyState /> : null}
               {messages.map((message, index) => {
                 const isLast = index === messages.length - 1;
                 if (message.role === "assistant") {
                   return (
-                    <div key={message.id} className="flex gap-3">
-                      <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-qz-primary text-[11px] font-serif bg-qz-primary/10 mt-0.5">
+                    <div key={message.id} className="flex gap-3.5">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-qz-primary text-[11px] font-serif bg-qz-primary/10 mt-0.5">
                         灵
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-[14.5px] text-qz-text-strong dark:text-qz-text-dark">
+                        <div className="text-[15px] leading-[1.9] text-qz-text-strong dark:text-qz-text-dark">
                           <MessageBody content={message.content} />
                         </div>
                         {message.rag ? <RagEvidenceCard rag={message.rag} /> : null}
-                        {isLast && message.rag ? (
-                          <div className="mt-4 flex flex-wrap gap-2">
-                            <button
-                              type="button"
-                              onClick={generatePracticeFromLatestRag}
-                              className="px-3 py-1.5 rounded-full bg-qz-primary text-white text-[12px] hover:bg-qz-dark transition-colors"
-                            >
-                              基于当前命中资料出题
-                            </button>
-                          </div>
-                        ) : null}
-                        {isLast ? <StrategyBar onSwitchStyle={switchStyle} /> : null}
+                        {isLast && message.triggers?.some((trigger) => trigger === "graph" || trigger === "pomodoro") ? <StrategyBar onUnderstood={handleUnderstood} /> : null}
                       </div>
                     </div>
                   );
                 }
                 return (
                   <div key={message.id} className="flex justify-end">
-                    <div className="max-w-[78%] rounded-[18px] rounded-br-[6px] px-4 py-2.5 text-[14px] leading-[1.75] text-qz-text-strong dark:text-qz-text-dark bg-qz-primary/8 border border-qz-primary/15">
+                    <div className="max-w-[72%] rounded-[16px] rounded-br-[8px] px-4 py-3 text-[14px] leading-[1.75] text-qz-text-strong dark:text-qz-text-dark bg-[#F4F7F6] dark:bg-white/[0.05] border border-black/[0.04] dark:border-white/[0.06]">
                       {message.content}
                     </div>
                   </div>
@@ -894,13 +908,13 @@ export default function Study() {
             </div>
           </div>
 
-          <div className="px-10 pb-6 pt-2">
-            <div className="max-w-[760px] mx-auto">
+          <div className="px-8 lg:px-10 pb-6 pt-2">
+            <div className="max-w-[900px] mx-auto">
               <div
-                className="flex items-end gap-2 rounded-[24px] bg-white dark:bg-qz-card-dark px-3 py-2.5 border border-black/[0.05] dark:border-white/[0.08]"
-                style={{ boxShadow: "0 4px 24px -8px rgba(45,122,107,0.18), 0 2px 8px -2px rgba(0,0,0,0.04)" }}
+                className="flex items-end gap-2 rounded-[22px] bg-white/94 dark:bg-qz-card-dark px-3 py-2.5 border border-black/[0.06] dark:border-white/[0.08] min-h-[72px]"
+                style={{ boxShadow: "0 10px 28px -16px rgba(45,122,107,0.14), 0 2px 6px -2px rgba(0,0,0,0.04)" }}
               >
-                <button type="button" className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-black/[0.04] dark:hover:bg-white/[0.05] text-qz-text-muted shrink-0">
+                <button type="button" className="w-9 h-9 rounded-[10px] flex items-center justify-center hover:bg-black/[0.04] dark:hover:bg-white/[0.05] text-qz-text-muted shrink-0">
                   <Paperclip size={15} />
                 </button>
                 <textarea
@@ -913,137 +927,136 @@ export default function Study() {
                     }
                   }}
                   rows={1}
-                  placeholder={isGeneratingAnswer ? "灵正在翻资料和调用模型…" : "把疑问丢给灵 · Enter 发送"}
+                  placeholder={isGeneratingAnswer ? "灵正在整理资料与模型回答…" : "输入问题，Enter 发送"}
                   disabled={isGeneratingAnswer}
-                  className="flex-1 resize-none bg-transparent outline-none text-[13.5px] leading-[1.6] py-2 max-h-[140px] disabled:opacity-60"
+                  className="flex-1 resize-none bg-transparent outline-none text-[14px] leading-[1.7] py-2.5 max-h-[160px] disabled:opacity-60 placeholder:text-qz-text-muted/75"
                 />
-                <button type="button" className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-black/[0.04] dark:hover:bg-white/[0.05] text-qz-text-muted shrink-0">
+                <button type="button" className="w-9 h-9 rounded-[10px] flex items-center justify-center hover:bg-black/[0.04] dark:hover:bg-white/[0.05] text-qz-text-muted shrink-0">
                   <Mic size={15} />
                 </button>
                 <button
                   type="button"
                   onClick={sendMessage}
                   className={clsx(
-                    "w-9 h-9 rounded-full flex items-center justify-center text-white shrink-0 transition-all",
+                    "w-10 h-10 rounded-[12px] flex items-center justify-center text-white shrink-0 transition-all",
                     input.trim() ? "bg-qz-primary hover:bg-qz-dark" : "bg-qz-primary/40"
                   )}
                 >
-                  <SendHorizonal size={14} />
+                  <SendHorizonal size={15} />
                 </button>
               </div>
             </div>
           </div>
         </main>
 
-        <aside
-          className={clsx(
-            "border-l border-black/5 dark:border-white/5 bg-white/40 dark:bg-white/[0.02] overflow-hidden transition-all duration-300",
-            activePanel ? "w-[320px]" : "w-0"
-          )}
-        >
-          {activePanel ? (
-            <div className="w-[320px] h-full flex flex-col">
-              <div className="px-5 pt-5 pb-3 flex items-start justify-between gap-3">
-                <div>
-                  <div className="flex items-center gap-1.5 text-qz-primary mb-1">
-                    {(() => {
-                      const Icon = PANEL_META[activePanel].icon;
-                      return <Icon size={14} />;
-                    })()}
-                    <div className="font-serif text-[16px]">{PANEL_META[activePanel].label}</div>
+        <div className="shrink-0 pr-3 pb-4 pt-1 flex items-start gap-2">
+          <aside
+            className={clsx(
+              "overflow-hidden transition-all duration-300",
+              activePanel ? "w-[344px]" : "w-0"
+            )}
+          >
+            {activePanel ? (
+              <div className="w-[344px] h-full rounded-[22px] border border-black/[0.05] dark:border-white/[0.08] bg-white/72 dark:bg-white/[0.03] backdrop-blur-xl shadow-[0_18px_40px_-30px_rgba(15,23,42,0.18)] flex flex-col">
+                <div className="px-5 pt-5 pb-3 flex items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-1.5 text-qz-primary mb-1">
+                      {(() => {
+                        const Icon = PANEL_META[activePanel].icon;
+                        return <Icon size={14} />;
+                      })()}
+                      <div className="font-serif text-[16px]">{PANEL_META[activePanel].label}</div>
+                    </div>
+                    <div className="text-[11px] text-qz-text-muted">{PANEL_META[activePanel].hint}</div>
                   </div>
-                  <div className="text-[11px] text-qz-text-muted">{PANEL_META[activePanel].hint}</div>
+                  <button
+                    type="button"
+                    onClick={() => setActivePanel(null)}
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-qz-text-muted hover:bg-black/[0.04] dark:hover:bg-white/[0.05]"
+                  >
+                    <X size={13} />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setActivePanel(null)}
-                  className="w-7 h-7 rounded-full flex items-center justify-center text-qz-text-muted hover:bg-black/[0.04] dark:hover:bg-white/[0.05]"
-                >
-                  <X size={13} />
-                </button>
-              </div>
 
-              <div className="flex-1 overflow-y-auto px-5 pb-5">
-
-                {activePanel === "pomodoro" ? (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-center py-6">
-                      <div className="relative w-32 h-32">
-                        <svg viewBox="0 0 120 120" className="w-32 h-32 -rotate-90">
-                          <circle cx="60" cy="60" r="54" fill="none" stroke="currentColor" strokeWidth="4" className="text-qz-primary/10" />
-                          <circle
-                            cx="60"
-                            cy="60"
-                            r="54"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                            strokeLinecap="round"
-                            strokeDasharray={339.29}
-                            strokeDashoffset={339.29 * (1 - pomodoroProgress)}
-                            className="text-qz-primary transition-all duration-500"
-                          />
-                        </svg>
-                        <div className="absolute inset-0 flex flex-col items-center justify-center">
-                          <div className="font-serif text-[28px] text-qz-primary tabular-nums">{formatTime(pomodoroSeconds)}</div>
-                          <div className="text-[11px] text-qz-text-muted mt-1">{pomodoroRunning ? "专注中" : "已暂停"}</div>
+                <div className="flex-1 overflow-y-auto px-5 pb-5">
+                  {activePanel === "pomodoro" ? (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-center py-6">
+                        <div className="relative w-32 h-32">
+                          <svg viewBox="0 0 120 120" className="w-32 h-32 -rotate-90">
+                            <circle cx="60" cy="60" r="54" fill="none" stroke="currentColor" strokeWidth="4" className="text-qz-primary/10" />
+                            <circle
+                              cx="60"
+                              cy="60"
+                              r="54"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                              strokeLinecap="round"
+                              strokeDasharray={339.29}
+                              strokeDashoffset={339.29 * (1 - pomodoroProgress)}
+                              className="text-qz-primary transition-all duration-500"
+                            />
+                          </svg>
+                          <div className="absolute inset-0 flex flex-col items-center justify-center">
+                            <div className="font-serif text-[28px] text-qz-primary tabular-nums">{formatTime(pomodoroSeconds)}</div>
+                            <div className="text-[11px] text-qz-text-muted mt-1">{pomodoroRunning ? "专注中" : "已暂停"}</div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setPomodoroRunning((v) => !v)}
-                        className="h-9 rounded-full bg-qz-primary text-white text-[12px] hover:bg-qz-dark"
-                      >
-                        {pomodoroRunning ? "暂停" : "开始"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPomodoroRunning(false);
-                          setPomodoroSeconds(totalSeconds);
-                        }}
-                        className="h-9 rounded-full border border-black/[0.08] dark:border-white/[0.1] text-[12px] text-qz-text-muted hover:bg-black/[0.04] dark:hover:bg-white/[0.05] flex items-center justify-center gap-1.5"
-                      >
-                        <RotateCcw size={12} />
-                        重置
-                      </button>
-                    </div>
-                    <div className="text-[11px] text-qz-text-muted leading-[1.7] pt-2 border-t border-black/[0.05] dark:border-white/[0.06]">
-                      灵建议：先专注 25 分钟解决当前知识点，结束后再继续聊。
-                    </div>
-                  </div>
-                ) : null}
-
-                {activePanel === "resource" ? (
-                  <div className="space-y-4">
-                    {selectedResource ? (
-                      <div className="rounded-[16px] border border-qz-primary/15 bg-qz-primary/6 px-4 py-4">
-                        <div className="text-[11px] text-qz-primary font-medium mb-1">当前资料</div>
-                        <div className="text-[14px] text-qz-text-strong dark:text-qz-text-dark">{selectedResource.title}</div>
-                        <div className="text-[11px] text-qz-text-muted mt-1 leading-6">{selectedResource.summary}</div>
-                        <div className="mt-3 text-[11px] text-qz-text-muted">
-                          重点：{selectedResource.highlights.length > 0 ? selectedResource.highlights.join("；") : "暂无"}
-                        </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setPomodoroRunning((v) => !v)}
+                          className="h-9 rounded-full bg-qz-primary text-white text-[12px] hover:bg-qz-dark"
+                        >
+                          {pomodoroRunning ? "暂停" : "开始"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPomodoroRunning(false);
+                            setPomodoroSeconds(totalSeconds);
+                          }}
+                          className="h-9 rounded-full border border-black/[0.08] dark:border-white/[0.1] text-[12px] text-qz-text-muted hover:bg-black/[0.04] dark:hover:bg-white/[0.05] flex items-center justify-center gap-1.5"
+                        >
+                          <RotateCcw size={12} />
+                          重置
+                        </button>
                       </div>
-                    ) : null}
+                      <div className="text-[11px] text-qz-text-muted leading-[1.7] pt-2 border-t border-black/[0.05] dark:border-white/[0.06]">
+                        灵建议：先专注 25 分钟解决当前知识点，结束后再继续聊。
+                      </div>
+                    </div>
+                  ) : null}
 
-                    {latestRag ? (
-                      <div>
-                        <div className="flex items-center justify-between gap-3 mb-2">
-                          <div className="text-[12px] text-qz-text-muted">本次检索命中</div>
-                          <button
-                            type="button"
-                            onClick={generatePracticeFromLatestRag}
-                            className="text-[11px] px-2.5 py-1 rounded-full bg-qz-primary/10 text-qz-primary hover:bg-qz-primary/15 transition-colors"
-                          >
-                            基于命中出题
-                          </button>
+                  {activePanel === "resource" ? (
+                    <div className="space-y-4">
+                      {selectedResource ? (
+                        <div className="rounded-[16px] border border-qz-primary/15 bg-qz-primary/6 px-4 py-4">
+                          <div className="text-[11px] text-qz-primary font-medium mb-1">当前资料</div>
+                          <div className="text-[14px] text-qz-text-strong dark:text-qz-text-dark">{selectedResource.title}</div>
+                          <div className="text-[11px] text-qz-text-muted mt-1 leading-6">{selectedResource.summary}</div>
+                          <div className="mt-3 text-[11px] text-qz-text-muted">
+                            重点：{selectedResource.highlights.length > 0 ? selectedResource.highlights.join("；") : "暂无"}
+                          </div>
                         </div>
-                        <div className="space-y-2">
-                          {latestRag.results.length > 0 ? (
-                            latestRag.results.map((match) => (
+                      ) : null}
+
+                      {latestRag ? (
+                        <div>
+                          <div className="flex items-center justify-between gap-3 mb-2">
+                            <div className="text-[12px] text-qz-text-muted">本次检索命中</div>
+                            <button
+                              type="button"
+                              onClick={generatePracticeFromLatestRag}
+                              className="text-[11px] px-2.5 py-1 rounded-full bg-qz-primary/10 text-qz-primary hover:bg-qz-primary/15 transition-colors"
+                            >
+                              基于命中出题
+                            </button>
+                          </div>
+                                 <div className="space-y-2">
+                            {latestRag.results.map((match) => (
                               <div key={match.resource.id} className="rounded-[14px] border border-black/[0.05] dark:border-white/[0.06] px-3.5 py-3 bg-white/70 dark:bg-black/10">
                                 <div className="flex items-start justify-between gap-3">
                                   <div className="min-w-0">
@@ -1061,129 +1074,149 @@ export default function Study() {
                                   上下文：{match.isCurrentResource ? "当前资料 boost" : "非当前资料"} · {match.isCurrentNodeLinked ? "当前节点 boost" : "非当前节点"}
                                 </div>
                               </div>
-                            ))
-                          ) : (
-                            <div className="rounded-[14px] border border-[#E8A93C]/25 bg-[#E8A93C]/8 px-3.5 py-3 text-[11px] text-qz-text-muted leading-6">
-                              这次没有检索到足够明确的资料命中，建议把问题问得更具体一些。
-                            </div>
-                          )}
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    ) : null}
+                      ) : null}
 
-                    {practiceHint ? (
-                      <div className="rounded-[14px] border border-[#E8A93C]/25 bg-[#E8A93C]/8 px-3.5 py-3 text-[11px] text-qz-text-muted leading-6">
-                        {practiceHint}
-                      </div>
-                    ) : null}
+                      {practiceHint ? (
+                        <div className="rounded-[14px] border border-[#E8A93C]/25 bg-[#E8A93C]/8 px-3.5 py-3 text-[11px] text-qz-text-muted leading-6">
+                          {practiceHint}
+                        </div>
+                      ) : null}
 
-                    <PracticePanel practice={practiceSet} />
+                      <PracticePanel practice={practiceSet} />
 
-                    <div>
-                      <div className="text-[12px] text-qz-text-muted mb-2">推荐补充资源</div>
-                      <ul className="space-y-2">
-                        {RESOURCES.map((resource) => (
-                          <li key={resource.id}>
-                            <button
-                              type="button"
-                              className="w-full text-left rounded-[12px] p-3 hover:bg-black/[0.04] dark:hover:bg-white/[0.05] transition-colors group"
-                            >
-                              <div className="flex items-start gap-2.5">
-                                <span className="mt-0.5 w-6 h-6 rounded-full bg-qz-primary/10 flex items-center justify-center shrink-0 text-qz-primary">
-                                  <BookMarked size={12} />
-                                </span>
-                                <div className="min-w-0 flex-1">
-                                  <div className="text-[13px] text-qz-text-strong dark:text-qz-text-dark leading-[1.5]">
-                                    {resource.title}
-                                  </div>
-                                  <div className="text-[11px] text-qz-text-muted mt-1 flex items-center gap-2">
-                                    <span>{resource.type}</span>
-                                    <span className="opacity-50">·</span>
-                                    <span>{resource.duration}</span>
+                      <div>
+                        <div className="text-[12px] text-qz-text-muted mb-2">推荐补充资源</div>
+                        <ul className="space-y-2">
+                          {RESOURCES.map((resource) => (
+                            <li key={resource.id}>
+                              <button
+                                type="button"
+                                className="w-full text-left rounded-[12px] p-3 hover:bg-black/[0.04] dark:hover:bg-white/[0.05] transition-colors group"
+                              >
+                                <div className="flex items-start gap-2.5">
+                                  <span className="mt-0.5 w-6 h-6 rounded-full bg-qz-primary/10 flex items-center justify-center shrink-0 text-qz-primary">
+                                    <BookMarked size={12} />
+                                  </span>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="text-[13px] text-qz-text-strong dark:text-qz-text-dark leading-[1.5]">
+                                      {resource.title}
+                                    </div>
+                                    <div className="text-[11px] text-qz-text-muted mt-1 flex items-center gap-2">
+                                      <span>{resource.type}</span>
+                                      <span className="opacity-50">·</span>
+                                      <span>{resource.duration}</span>
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
+                       </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     </div>
-                  </div>
-                ) : null}
+                  ) : null}
 
-                {activePanel === "note" ? (
-                  <div className="space-y-3">
-                    <div className="text-[11px] text-qz-text-muted">灵已经把这一段帮你记下来了，你可以直接编辑。</div>
-                    <textarea
-                      value={noteDraft}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setNoteDraft(value);
-                        const firstNote = data.notes[0];
-                        if (firstNote) updateNote(firstNote.id, value);
-                      }}
-                      rows={18}
-                      placeholder="在这里写点什么……"
-                      className="w-full resize-none rounded-[14px] bg-white/65 dark:bg-white/[0.03] border border-black/[0.05] dark:border-white/[0.06] px-3.5 py-3 text-[12.5px] leading-[1.7] outline-none placeholder:text-qz-text-muted/60 focus:border-qz-primary/30 transition-colors"
-                    />
-                  </div>
-                ) : null}
+                  {activePanel === "note" ? (
+                    <div className="space-y-3">
+                      <div className="text-[11px] text-qz-text-muted">灵已经把这一段帮你记下来了，你可以直接编辑。</div>
+                      <textarea
+                        value={noteDraft}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setNoteDraft(value);
+                          const firstNote = data.notes[0];
+                          if (firstNote) updateNote(firstNote.id, value);
+                        }}
+                        rows={18}
+                        placeholder="在这里写点什么……"
+                        className="w-full resize-none rounded-[14px] bg-white/65 dark:bg-white/[0.03] border border-black/[0.05] dark:border-white/[0.06] px-3.5 py-3 text-[12.5px] leading-[1.7] outline-none placeholder:text-qz-text-muted/60 focus:border-qz-primary/30 transition-colors"
+                      />
+                    </div>
+                  ) : null}
 
-                {activePanel === "graph" ? (
-                  <div className="relative">
-                    {[
-                      { label: "罗尔定理", state: selectedNode?.id === "node-rolle" ? "active" as const : "done" as const, hint: selectedNode?.id === "node-rolle" ? "当前资料命中" : "前置 · 已掌握" },
-                      { label: "中值定理", state: selectedNode?.id === "node-mvt" || !selectedNode ? "active" as const : "done" as const, hint: selectedNode?.id === "node-mvt" || !selectedNode ? "正在学习" : "核心节点" },
-                      { label: "柯西中值定理", state: selectedNode?.id === "node-cauchy" ? "active" as const : "next" as const, hint: selectedNode?.id === "node-cauchy" ? "当前资料命中" : "下一站" },
-                      { label: "导数应用", state: selectedNode?.id === "node-applications" ? "active" as const : "later" as const, hint: selectedNode?.id === "node-applications" ? "当前资料命中" : "后续延伸" },
-                    ].map((node, i, arr) => {
-                      const isLast = i === arr.length - 1;
-                      return (
-                        <div key={node.label} className="flex gap-3 relative">
-                          <div className="flex flex-col items-center">
-                            <div
-                              className={clsx(
-                                "w-3 h-3 rounded-full shrink-0 z-10 transition-all",
-                                node.state === "done" && "bg-qz-mastered",
-                                node.state === "active" && "bg-qz-primary ring-4 ring-qz-primary/15",
-                                node.state === "next" && "bg-white border-2 border-qz-primary/40",
-                                node.state === "later" && "bg-black/10 dark:bg-white/10"
-                              )}
-                            />
-                            {!isLast ? (
+                  {activePanel === "graph" ? (
+                    <div className="relative">
+                      {[
+                        { label: "罗尔定理", state: selectedNode?.id === "node-rolle" ? "active" as const : "done" as const, hint: selectedNode?.id === "node-rolle" ? "当前资料命中" : "前置 · 已掌握" },
+                        { label: "中值定理", state: selectedNode?.id === "node-mvt" || !selectedNode ? "active" as const : "done" as const, hint: selectedNode?.id === "node-mvt" || !selectedNode ? "正在学习" : "核心节点" },
+                        { label: "柯西中值定理", state: selectedNode?.id === "node-cauchy" ? "active" as const : "next" as const, hint: selectedNode?.id === "node-cauchy" ? "当前资料命中" : "下一站" },
+                        { label: "导数应用", state: selectedNode?.id === "node-applications" ? "active" as const : "later" as const, hint: selectedNode?.id === "node-applications" ? "当前资料命中" : "后续延伸" },
+                      ].map((node, i, arr) => {
+                        const isLast = i === arr.length - 1;
+                        return (
+                          <div key={node.label} className="flex gap-3 relative">
+                            <div className="flex flex-col items-center">
                               <div
                                 className={clsx(
-                                  "w-px flex-1 my-1",
-                                  node.state === "done" ? "bg-qz-mastered/40" : "bg-black/8 dark:bg-white/10"
+                                  "w-3 h-3 rounded-full shrink-0 z-10 transition-all",
+                                  node.state === "done" && "bg-qz-mastered",
+                                  node.state === "active" && "bg-qz-primary ring-4 ring-qz-primary/15",
+                                  node.state === "next" && "bg-white border-2 border-qz-primary/40",
+                                  node.state === "later" && "bg-black/10 dark:bg-white/10"
                                 )}
-                                style={{ minHeight: 28 }}
                               />
-                            ) : null}
-                          </div>
-                          <div className={clsx("pb-5", isLast && "pb-0")}>
-                            <div
-                              className={clsx(
-                                "text-[13px] leading-tight",
-                                node.state === "active"
-                                  ? "text-qz-primary font-medium"
-                                  : node.state === "later"
-                                  ? "text-qz-text-muted"
-                                  : "text-qz-text-strong dark:text-qz-text-dark"
-                              )}
-                            >
-                              {node.label}
+                              {!isLast ? (
+                                <div
+                                  className={clsx(
+                                    "w-px flex-1 my-1",
+                                    node.state === "done" ? "bg-qz-mastered/40" : "bg-black/8 dark:bg-white/10"
+                                  )}
+                                  style={{ minHeight: 28 }}
+                                />
+                              ) : null}
                             </div>
-                            <div className="text-[11px] text-qz-text-muted mt-0.5">{node.hint}</div>
+                            <div className={clsx("pb-5", isLast && "pb-0")}>
+                              <div
+                                className={clsx(
+                                  "text-[13px] leading-tight",
+                                  node.state === "active"
+                                    ? "text-qz-primary font-medium"
+                                    : node.state === "later"
+                                    ? "text-qz-text-muted"
+                                    : "text-qz-text-strong dark:text-qz-text-dark"
+                                )}
+                              >
+                                {node.label}
+                              </div>
+                              <div className="text-[11px] text-qz-text-muted mt-0.5">{node.hint}</div>
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : null}
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
               </div>
-            </div>
-          ) : null}
-        </aside>
+            ) : null}
+          </aside>
+
+          <div className="flex flex-col items-center gap-1 rounded-[24px] border border-black/[0.05] dark:border-white/[0.08] bg-white/88 dark:bg-white/[0.04] p-1.5 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.18)] backdrop-blur-xl">
+            {FLOATING_PANEL_KEYS.map((key) => {
+              const meta = PANEL_META[key];
+              const Icon = meta.icon;
+              const active = activePanel === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setActivePanel(active ? null : key)}
+                  title={meta.label}
+                  className={clsx(
+                    "w-10 h-10 rounded-[14px] border border-transparent flex items-center justify-center transition-all",
+                    active
+                      ? "bg-qz-primary/10 text-qz-primary border-qz-primary/15"
+                      : "text-qz-text-muted hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+                  )}
+                >
+                  <Icon size={16} />
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );
