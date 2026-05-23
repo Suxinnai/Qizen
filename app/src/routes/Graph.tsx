@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import clsx from "clsx";
-import { Network, Target } from "lucide-react";
+import { Network, Target, Compass, ArrowRight, BookOpen } from "lucide-react";
 import {
   loadAppData,
   type KnowledgeEdge,
@@ -12,12 +12,76 @@ import {
 function stateColor(state: KnowledgeNodeState) {
   if (state === "mastered") return "#4CAF7C";
   if (state === "current") return "#2D7A6B";
-  if (state === "next") return "#E8A93C";
-  return "#D4D0C8";
+  if (state === "next") return "#C4C0B6";
+  return "#A8A49C";
+}
+
+function stateLabel(state: KnowledgeNodeState) {
+  if (state === "current") return "正在学习";
+  if (state === "mastered") return "已掌握";
+  if (state === "next") return "下一步";
+  return "待开启";
+}
+
+function stateBadgeClass(state: KnowledgeNodeState) {
+  if (state === "mastered") return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300";
+  if (state === "current") return "bg-qz-primary/10 text-qz-primary";
+  if (state === "next") return "bg-black/5 dark:bg-white/10 text-qz-text-muted";
+  return "bg-black/5 dark:bg-white/5 text-qz-text-muted opacity-60";
 }
 
 function findNode(nodes: KnowledgeNode[], nodeId: string) {
   return nodes.find((node) => node.id === nodeId);
+}
+
+function computeNodeDegree(nodeId: string, edges: KnowledgeEdge[]) {
+  return edges.filter((e) => e.source === nodeId || e.target === nodeId).length;
+}
+
+function nodeRadius(degree: number, isActive: boolean) {
+  const base = Math.min(22, 10 + degree * 2);
+  return isActive ? base + 4 : base;
+}
+
+function buildRecommendations(nodes: KnowledgeNode[], edges: KnowledgeEdge[]) {
+  const currentNodes = nodes.filter((n) => n.state === "current");
+  const nextNodes = nodes.filter((n) => n.state === "next");
+
+  const recommendations: { node: KnowledgeNode; reason: string; priority: number }[] = [];
+
+  for (const node of currentNodes) {
+    const preIds = edges.filter((e) => e.target === node.id).map((e) => e.source);
+    const preNodes = preIds.map((id) => findNode(nodes, id)).filter(Boolean) as KnowledgeNode[];
+    const allMastered = preNodes.every((p) => p.state === "mastered");
+    const reason = preNodes.length > 0
+      ? allMastered
+        ? `前置节点「${preNodes.map((p) => p.label).join("、")}」已掌握，可以全力推进。`
+        : `前置节点「${preNodes.map((p) => p.label).join("、")}」尚未全部掌握，建议先巩固。`
+      : "这是当前正在学习的核心节点。";
+    recommendations.push({ node, reason, priority: 1 });
+  }
+
+  for (const node of nextNodes) {
+    const preIds = edges.filter((e) => e.target === node.id).map((e) => e.source);
+    const preNodes = preIds.map((id) => findNode(nodes, id)).filter(Boolean) as KnowledgeNode[];
+    const allMastered = preNodes.every((p) => p.state === "mastered");
+    const someMastered = preNodes.some((p) => p.state === "mastered");
+    let reason: string;
+    let priority: number;
+    if (allMastered) {
+      reason = `前置节点「${preNodes.map((p) => p.label).join("、")}」已全部掌握，随时可以开始。`;
+      priority = 2;
+    } else if (someMastered) {
+      reason = `部分前置已掌握，可以预习了解。`;
+      priority = 3;
+    } else {
+      reason = `前置节点尚未掌握，建议按顺序推进。`;
+      priority = 4;
+    }
+    recommendations.push({ node, reason, priority });
+  }
+
+  return recommendations.sort((a, b) => a.priority - b.priority).slice(0, 4);
 }
 
 function EdgePath({ edge, nodes, activeNodeId }: { edge: KnowledgeEdge; nodes: KnowledgeNode[]; activeNodeId: string }) {
@@ -36,7 +100,7 @@ function EdgePath({ edge, nodes, activeNodeId }: { edge: KnowledgeEdge; nodes: K
       fill="none"
       stroke={isActive ? "#2D7A6B" : "#D7E5DF"}
       strokeWidth={isActive ? 3 : 2}
-      opacity={isActive ? 1 : 0.9}
+      opacity={isActive ? 1 : 0.7}
     />
   );
 }
@@ -53,7 +117,15 @@ export default function Graph() {
   const activeNode = findNode(nodes, activeNodeId) ?? nodes[0];
   const relatedNodeIds = Array.isArray(activeNode?.related) ? activeNode.related : [];
   const relatedNodes = nodes.filter((node) => relatedNodeIds.includes(node.id));
-  const linkedResources = data.libraryItems.filter((item) => (Array.isArray(item.linkedNodeIds) ? item.linkedNodeIds : []).includes(activeNodeId));
+  const linkedResources = data.libraryItems.filter((item) =>
+    (Array.isArray(item.linkedNodeIds) ? item.linkedNodeIds : []).includes(activeNodeId)
+  );
+
+  const recommendations = useMemo(() => buildRecommendations(nodes, edges), [nodes, edges]);
+
+  function navigateToStudy(nodeId: string) {
+    navigate("/study", { state: { source: "graph", nodeId } });
+  }
 
   return (
     <div className="relative h-full overflow-hidden">
@@ -66,7 +138,8 @@ export default function Graph() {
           <div className="flex items-center gap-3 text-[12px] text-qz-text-muted">
             <span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-[#4CAF7C]" />已掌握</span>
             <span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-[#2D7A6B]" />当前</span>
-            <span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-[#E8A93C]" />下一步</span>
+            <span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-[#C4C0B6]" />下一步</span>
+            <span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-[#A8A49C] border border-dashed border-[#A8A49C]" />待开启</span>
           </div>
         </div>
 
@@ -77,7 +150,7 @@ export default function Graph() {
                 <Network size={16} />
                 <span className="font-serif text-[20px]">知识网络</span>
               </div>
-              <div className="text-[12px] text-qz-text-muted">点一个节点，右侧就会展开解释和学习入口</div>
+              <div className="text-[12px] text-qz-text-muted">节点越大代表关联越多；颜色反映学习进度</div>
             </div>
 
             <div className="flex-1 min-h-0 p-6">
@@ -88,6 +161,11 @@ export default function Graph() {
 
                 {nodes.map((node) => {
                   const isActive = node.id === activeNodeId;
+                  const degree = computeNodeDegree(node.id, edges);
+                  const r = nodeRadius(degree, isActive);
+                  const color = stateColor(node.state);
+                  const isLocked = node.state === "locked";
+
                   return (
                     <g
                       key={node.id}
@@ -95,20 +173,23 @@ export default function Graph() {
                       className="cursor-pointer"
                       onClick={() => setActiveNodeId(node.id)}
                     >
+                      {isActive ? <circle r={r + 8} fill="none" stroke="#2D7A6B" strokeOpacity="0.18" strokeWidth={10} /> : null}
                       <circle
-                        r={isActive ? 18 : 13}
-                        fill={stateColor(node.state)}
-                        opacity={node.state === "locked" ? 0.75 : 1}
+                        r={r}
+                        fill={isLocked ? "none" : color}
+                        stroke={isLocked ? color : "none"}
+                        strokeWidth={isLocked ? 2 : 0}
+                        strokeDasharray={isLocked ? "4 3" : "none"}
+                        opacity={isLocked ? 0.5 : 1}
                       />
-                      {isActive ? <circle r={26} fill="none" stroke="#2D7A6B" strokeOpacity="0.18" strokeWidth={10} /> : null}
                       <text
-                        y={36}
+                        y={r + 16}
                         textAnchor="middle"
                         className={clsx(
                           "select-none",
                           isActive ? "font-medium" : ""
                         )}
-                        style={{ fontSize: 13, fill: isActive ? "#2D7A6B" : "#6E6A63" }}
+                        style={{ fontSize: isActive ? 14 : 12, fill: isActive ? "#2D7A6B" : "#6E6A63" }}
                       >
                         {node.label}
                       </text>
@@ -119,33 +200,52 @@ export default function Graph() {
             </div>
           </div>
 
-          <div className="min-h-0 flex flex-col gap-4">
+          <div className="min-h-0 flex flex-col gap-4 overflow-y-auto pr-1">
+            {/* Active node detail panel */}
             <div className="qz-card !p-5">
               <div className="flex items-center gap-2 mb-3 text-qz-primary">
                 <Target size={16} />
-                <span className="font-serif text-[20px]">当前节点</span>
+                <span className="font-serif text-[20px]">节点详情</span>
               </div>
               {activeNode ? (
                 <>
                   <div className="font-serif text-[28px] leading-tight text-qz-text-strong dark:text-qz-text-dark mb-2">
                     {activeNode.label}
                   </div>
-                  <div className="text-[11px] px-2.5 py-1 rounded-full inline-flex bg-qz-primary/10 text-qz-primary mb-4">
-                    {activeNode.state === "current"
-                      ? "正在学习"
-                      : activeNode.state === "mastered"
-                      ? "已掌握"
-                      : activeNode.state === "next"
-                      ? "下一站"
-                      : "待开启"}
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className={clsx("text-[11px] px-2.5 py-1 rounded-full", stateBadgeClass(activeNode.state))}>
+                      {stateLabel(activeNode.state)}
+                    </span>
+                    <span className="text-[11px] px-2.5 py-1 rounded-full bg-black/5 dark:bg-white/5 text-qz-text-muted">
+                      {activeNode.kind === "theorem" ? "定理" : activeNode.kind === "application" ? "应用" : activeNode.kind === "topic" ? "主题" : "概念"}
+                    </span>
                   </div>
-                  <p className="text-[13px] text-qz-text-muted leading-7 mb-5">{activeNode.summary}</p>
+                  <p className="text-[13px] text-qz-text-muted leading-7 mb-4">{activeNode.summary}</p>
                   <div className="rounded-[18px] bg-qz-primary/6 px-4 py-4 text-[12px] text-qz-text-muted leading-7 mb-5">
-                    {activeNode.studyHint}
+                    <span className="text-qz-primary font-medium">学习提示：</span>{activeNode.studyHint}
                   </div>
+
+                  {/* Linked resources */}
+                  {linkedResources.length > 0 && (
+                    <div className="mb-5">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <BookOpen size={13} className="text-qz-text-muted" />
+                        <span className="text-[12px] text-qz-text-muted">关联资料</span>
+                      </div>
+                      <div className="space-y-2">
+                        {linkedResources.map((item) => (
+                          <div key={item.id} className="rounded-[14px] border border-black/5 dark:border-white/5 px-3.5 py-2.5">
+                            <div className="text-[13px] text-qz-text-strong dark:text-qz-text-dark">{item.title}</div>
+                            <div className="text-[11px] text-qz-text-muted mt-1 leading-6 line-clamp-2">{item.summary}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <button
                     type="button"
-                    onClick={() => navigate("/study", { state: { source: "graph", nodeId: activeNode.id } })}
+                    onClick={() => navigateToStudy(activeNode.id)}
                     className="w-full h-10 rounded-full bg-qz-primary text-white text-[13px] hover:bg-qz-dark transition-colors"
                   >
                     去学习空间继续学这个
@@ -154,31 +254,60 @@ export default function Graph() {
               ) : null}
             </div>
 
-            <div className="qz-card !p-5 overflow-y-auto">
-              <div className="font-serif text-[20px] text-qz-text-strong dark:text-qz-text-dark mb-4">相关节点</div>
-              <div className="space-y-3 mb-5">
-                {relatedNodes.map((node) => (
-                  <div key={node.id} className="rounded-[16px] border border-black/5 dark:border-white/5 px-4 py-3">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: stateColor(node.state) }} />
-                      <div className="text-[13px] text-qz-text-strong dark:text-qz-text-dark">{node.label}</div>
-                    </div>
-                    <div className="text-[11px] text-qz-text-muted leading-6">{node.summary}</div>
-                  </div>
-                ))}
-              </div>
-              <div className="font-serif text-[18px] text-qz-text-strong dark:text-qz-text-dark mb-3">关联资料</div>
-              {linkedResources.length > 0 ? (
-                <div className="space-y-3">
-                  {linkedResources.map((item) => (
-                    <div key={item.id} className="rounded-[16px] border border-black/5 dark:border-white/5 px-4 py-3">
-                      <div className="text-[13px] text-qz-text-strong dark:text-qz-text-dark">{item.title}</div>
-                      <div className="text-[11px] text-qz-text-muted mt-1 leading-6">{item.summary}</div>
-                    </div>
+            {/* Related nodes */}
+            <div className="qz-card !p-5">
+              <div className="font-serif text-[18px] text-qz-text-strong dark:text-qz-text-dark mb-3">相关节点</div>
+              {relatedNodes.length > 0 ? (
+                <div className="space-y-2">
+                  {relatedNodes.map((node) => (
+                    <button
+                      key={node.id}
+                      type="button"
+                      onClick={() => setActiveNodeId(node.id)}
+                      className="w-full text-left rounded-[16px] border border-black/5 dark:border-white/5 px-4 py-3 hover:bg-black/[0.02] dark:hover:bg-white/[0.03] transition-colors"
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: stateColor(node.state) }} />
+                        <div className="text-[13px] text-qz-text-strong dark:text-qz-text-dark">{node.label}</div>
+                      </div>
+                      <div className="text-[11px] text-qz-text-muted leading-6">{node.summary}</div>
+                    </button>
                   ))}
                 </div>
               ) : (
-                <div className="text-[12px] text-qz-text-muted">当前节点还没有自动关联到资料。</div>
+                <div className="text-[12px] text-qz-text-muted">暂无关联节点。</div>
+              )}
+            </div>
+
+            {/* Recommended next step */}
+            <div className="qz-card !p-5">
+              <div className="flex items-center gap-2 mb-3 text-qz-primary">
+                <Compass size={16} />
+                <span className="font-serif text-[18px]">推荐下一步</span>
+              </div>
+              {recommendations.length > 0 ? (
+                <div className="space-y-2">
+                  {recommendations.map(({ node, reason }) => (
+                    <button
+                      key={node.id}
+                      type="button"
+                      onClick={() => navigateToStudy(node.id)}
+                      className="w-full text-left rounded-[16px] border border-qz-primary/15 bg-qz-primary/[0.03] px-4 py-3.5 hover:bg-qz-primary/[0.08] transition-colors group"
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: stateColor(node.state) }} />
+                          <span className="text-[13px] font-medium text-qz-text-strong dark:text-qz-text-dark">{node.label}</span>
+                        </div>
+                        <ArrowRight size={14} className="text-qz-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                      <div className="text-[11px] text-qz-text-muted leading-6">{reason}</div>
+                      <div className="mt-1.5 text-[11px] text-qz-primary">点击进入学习</div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-[12px] text-qz-text-muted">暂无可推荐的节点。</div>
               )}
             </div>
           </div>

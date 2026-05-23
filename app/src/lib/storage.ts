@@ -230,7 +230,6 @@ export interface UploadableFile {
 }
 
 const STORAGE_KEY = "qizen:mvp:v2";
-const LEGACY_LLM_SECRET_STORAGE_KEY = "qizen:secret:llm-api-key";
 
 const defaultSettings: AppSettings = {
   pomodoroMinutes: 25,
@@ -300,14 +299,14 @@ function seedGoals(): Goal[] {
           tasks: [
             {
               id: "task-math-1",
-              title: "理解拉格朗日中值定理及其几何意义",
+              title: "复习《人类简史》第 4 章",
               meta: "约 25 分钟 · 阅读",
               estimatedMinutes: 25,
-              done: false,
+              done: true,
             },
             {
               id: "task-math-2",
-              title: "对比罗尔定理与拉格朗日中值定理",
+              title: "完成线性代数练习册 P12-15",
               meta: "约 40 分钟 · 练习",
               estimatedMinutes: 40,
               done: false,
@@ -321,7 +320,7 @@ function seedGoals(): Goal[] {
           tasks: [
             {
               id: "task-math-3",
-              title: "完成导数应用基础题",
+              title: "整理产品设计课堂笔记",
               meta: "约 15 分钟 · 笔记",
               estimatedMinutes: 15,
               done: false,
@@ -454,6 +453,95 @@ function seedLibraryItems(): LibraryItem[] {
       linkedNodeIds: ["node-mvt", "node-applications"],
     },
   ];
+}
+
+function inferNodeKind(label: string): KnowledgeNodeKind {
+  const lower = label.toLowerCase();
+  if (lower.includes("定理") || lower.includes("theorem") || lower.includes("lemma")) return "theorem";
+  if (lower.includes("应用") || lower.includes("题型") || lower.includes("练习")) return "application";
+  return "concept";
+}
+
+function extractTermsFromText(text: string): string[] {
+  if (!text) return [];
+  const normalized = text
+    .replace(/[，。、；：""''《》【】（）\[\](){}]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const segments = normalized.split(/[，。、；：\s,;:]+/).filter((s) => s.length >= 2 && s.length <= 10);
+  return segments;
+}
+
+function extractTermsFromLibraryItem(item: { title: string; summary: string; highlights: string[] }): string[] {
+  const candidates: string[] = [];
+  candidates.push(...extractTermsFromText(item.title));
+  candidates.push(...extractTermsFromText(item.summary));
+  for (const h of item.highlights) {
+    candidates.push(...extractTermsFromText(h));
+  }
+  return candidates;
+}
+
+function buildKnowledgeNodesFromLibraryItems(
+  existingGraph: KnowledgeGraph,
+  newItems: { title: string; summary: string; highlights: string[]; linkedNodeIds: string[] }[],
+): KnowledgeGraph {
+  const existingLabels = new Set(existingGraph.nodes.map((n) => n.label));
+  const existingIds = new Set(existingGraph.nodes.map((n) => n.id));
+  const addedLabels = new Set<string>();
+
+  const newNodes: KnowledgeNode[] = [];
+  const newEdges: KnowledgeEdge[] = [];
+  let edgeCounter = existingGraph.edges.length + 1;
+
+  const centerX = existingGraph.nodes.length > 0
+    ? existingGraph.nodes.reduce((s, n) => s + n.x, 0) / existingGraph.nodes.length
+    : 400;
+  const centerY = existingGraph.nodes.length > 0
+    ? existingGraph.nodes.reduce((s, n) => s + n.y, 0) / existingGraph.nodes.length
+    : 250;
+  let angleStep = 0;
+  let nodeCounter = 0;
+
+  for (const item of newItems) {
+    const terms = extractTermsFromLibraryItem(item);
+    for (const term of terms) {
+      if (existingLabels.has(term) || addedLabels.has(term)) continue;
+      addedLabels.add(term);
+
+      const nodeId = `node-auto-${Date.now()}-${nodeCounter++}-${Math.random().toString(36).slice(2, 6)}`;
+      const angle = angleStep;
+      const radius = 160 + Math.random() * 60;
+      angleStep += 0.8 + Math.random() * 0.4;
+
+      newNodes.push({
+        id: nodeId,
+        label: term,
+        kind: inferNodeKind(term),
+        state: "next",
+        x: Math.round(centerX + Math.cos(angle) * radius),
+        y: Math.round(centerY + Math.sin(angle) * radius),
+        summary: `从资料《${item.title}》中提取的知识点。`,
+        related: [...item.linkedNodeIds],
+        studyHint: "刚发现的新节点，可以从关联资料开始了解。",
+      });
+
+      for (const linkedId of item.linkedNodeIds) {
+        if (existingIds.has(linkedId)) {
+          newEdges.push({
+            id: `edge-auto-${edgeCounter++}`,
+            source: linkedId,
+            target: nodeId,
+          });
+        }
+      }
+    }
+  }
+
+  return {
+    nodes: [...existingGraph.nodes, ...newNodes],
+    edges: [...existingGraph.edges, ...newEdges],
+  };
 }
 
 function createPracticeQuestionsFromText(
@@ -667,26 +755,6 @@ function canUseStorage() {
   return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
 }
 
-function stripSensitiveSettings(settings: AppSettings): AppSettings {
-  return {
-    ...settings,
-    llm: {
-      ...settings.llm,
-      apiKey: "",
-    },
-  };
-}
-
-function stripSensitiveData(data: AppData): AppData {
-  if (canUseStorage() && data.settings.llm.apiKey.trim()) {
-    window.localStorage.setItem(LEGACY_LLM_SECRET_STORAGE_KEY, data.settings.llm.apiKey.trim());
-  }
-  return {
-    ...data,
-    settings: stripSensitiveSettings(data.settings),
-  };
-}
-
 function normalizeLibraryItem(item: Partial<LibraryItem>): LibraryItem {
   const originalFileName = item.originalFileName ?? item.title ?? "未命名资料";
   const sizeBytes = typeof item.sizeBytes === "number" ? item.sizeBytes : 0;
@@ -760,7 +828,7 @@ export function loadAppData(): AppData {
 
 export function saveAppData(data: AppData) {
   if (!canUseStorage()) return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(stripSensitiveData(data)));
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
 export function updateAppData(updater: (data: AppData) => AppData) {
@@ -906,10 +974,24 @@ export function addLibraryFiles(files: UploadableFile[]) {
       };
     });
 
+    const parsedItems = newLibraryItems.filter((item) => item.parserStatus !== "unsupported");
+    const nextGraph = parsedItems.length > 0
+      ? buildKnowledgeNodesFromLibraryItems(
+          data.knowledgeGraph,
+          parsedItems.map((item) => ({
+            title: item.title,
+            summary: item.summary,
+            highlights: item.highlights,
+            linkedNodeIds: item.linkedNodeIds,
+          })),
+        )
+      : data.knowledgeGraph;
+
     return {
       ...data,
       libraryItems: [...newLibraryItems, ...data.libraryItems],
       practiceSets: [...newPracticeSets, ...data.practiceSets],
+      knowledgeGraph: nextGraph,
     };
   });
 }
@@ -952,10 +1034,21 @@ export function addParsedLibraryItems(items: ParsedLibraryItemInput[]) {
       };
     });
 
+    const nextGraph = buildKnowledgeNodesFromLibraryItems(
+      data.knowledgeGraph,
+      newLibraryItems.map((item) => ({
+        title: item.title,
+        summary: item.summary,
+        highlights: item.highlights,
+        linkedNodeIds: item.linkedNodeIds,
+      })),
+    );
+
     return {
       ...data,
       libraryItems: [...newLibraryItems, ...data.libraryItems],
       practiceSets: [...newPracticeSets, ...data.practiceSets],
+      knowledgeGraph: nextGraph,
     };
   });
 }

@@ -2,19 +2,23 @@ import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   BookOpen,
+  CheckCircle2,
+  AlertCircle,
   FileText,
   FileUp,
   Image as ImageIcon,
+  Loader2,
   Search,
   Sparkles,
   Upload,
 } from "lucide-react";
 import clsx from "clsx";
-import { parseLibraryFiles } from "../lib/library-parser";
+import { parseLibraryFile } from "../lib/library-parser";
 import {
   addParsedLibraryItems,
   loadAppData,
   type KnowledgeNode,
+  type ParsedLibraryItemInput,
   type PracticeSet,
   type ResourceType,
 } from "../lib/storage";
@@ -37,6 +41,17 @@ function parserStatusLabel(status: "parsed" | "partial" | "unsupported") {
   if (status === "parsed") return "已解析";
   if (status === "partial") return "部分解析";
   return "暂不支持深度解析";
+}
+
+interface UploadProgress {
+  currentFile: string;
+  currentIndex: number;
+  totalFiles: number;
+}
+
+interface UploadResult {
+  type: "success" | "error";
+  message: string;
 }
 
 function PracticeItem({ item }: { item: PracticeSet }) {
@@ -63,6 +78,8 @@ export default function Library() {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["key"]>("all");
   const [query, setQuery] = useState("");
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
+  const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filteredItems = useMemo(() => {
@@ -105,17 +122,46 @@ export default function Library() {
   async function onFilesChange(event: React.ChangeEvent<HTMLInputElement>) {
     const fileList = event.target.files;
     if (!fileList || fileList.length === 0) return;
+    const files = Array.from(fileList);
     setIsUploading(true);
-    try {
-      const files = Array.from(fileList);
-      const parsedItems = await parseLibraryFiles(files);
+    setUploadResults([]);
+    const parsedItems: ParsedLibraryItemInput[] = [];
+    const results: UploadResult[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      setUploadProgress({
+        currentFile: file.name,
+        currentIndex: i + 1,
+        totalFiles: files.length,
+      });
+      try {
+        const parsed = await parseLibraryFile(file);
+        parsedItems.push(parsed);
+        if (parsed.parserStatus === "unsupported") {
+          results.push({ type: "success", message: `${file.name}：已收纳，但格式暂不支持深度解析` });
+        } else {
+          results.push({ type: "success", message: `${file.name}：解析完成` });
+        }
+      } catch {
+        results.push({ type: "error", message: `${file.name}：解析失败，已跳过` });
+      }
+    }
+
+    if (parsedItems.length > 0) {
       addParsedLibraryItems(parsedItems);
       refresh();
       const newest = loadAppData().libraryItems[0];
       if (newest) setSelectedId(newest.id);
-    } finally {
-      setIsUploading(false);
-      event.target.value = "";
+    }
+
+    setUploadProgress(null);
+    setUploadResults(results);
+    setIsUploading(false);
+    event.target.value = "";
+
+    if (results.length > 0) {
+      window.setTimeout(() => setUploadResults([]), 5000);
     }
   }
 
@@ -127,24 +173,50 @@ export default function Library() {
             <h1 className="font-serif text-[34px] text-qz-primary mb-2">资料库</h1>
             <p className="font-serif italic text-[14px] text-qz-text-muted">厚积薄发，栖于卷帙</p>
           </div>
-          <div className="flex items-center gap-3">
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              className="hidden"
-              accept=".pdf,.doc,.docx,.md,.txt,.png,.jpg,.jpeg,.webp"
-              onChange={onFilesChange}
-            />
-            <button
-              type="button"
-              onClick={handleUpload}
-              disabled={isUploading}
-              className="h-10 px-4 rounded-full bg-qz-primary text-white text-[13px] flex items-center gap-2 hover:bg-qz-dark transition-colors disabled:opacity-60"
-            >
-              <Upload size={14} />
-              {isUploading ? "正在解析资料…" : "上传并解析资料"}
-            </button>
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex items-center gap-3">
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                className="hidden"
+                accept=".pdf,.doc,.docx,.md,.txt,.png,.jpg,.jpeg,.webp"
+                onChange={onFilesChange}
+              />
+              <button
+                type="button"
+                onClick={handleUpload}
+                disabled={isUploading}
+                className="h-10 px-4 rounded-full bg-qz-primary text-white text-[13px] flex items-center gap-2 hover:bg-qz-dark transition-colors disabled:opacity-60"
+              >
+                {isUploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                {isUploading ? "正在解析…" : "上传并解析资料"}
+              </button>
+            </div>
+            {uploadProgress ? (
+              <div className="flex items-center gap-2 text-[11px] text-qz-text-muted">
+                <Loader2 size={12} className="animate-spin text-qz-primary" />
+                <span>解析中（{uploadProgress.currentIndex}/{uploadProgress.totalFiles}）：{uploadProgress.currentFile}</span>
+              </div>
+            ) : null}
+            {uploadResults.length > 0 ? (
+              <div className="space-y-1.5 w-full max-w-[320px]">
+                {uploadResults.map((result, index) => (
+                  <div
+                    key={`${index}-${result.message}`}
+                    className={clsx(
+                      "flex items-start gap-2 rounded-[10px] px-3 py-2 text-[11px] leading-5",
+                      result.type === "success"
+                        ? "bg-emerald-500/8 text-emerald-700 dark:text-emerald-300"
+                        : "bg-rose-500/8 text-rose-700 dark:text-rose-300"
+                    )}
+                  >
+                    {result.type === "success" ? <CheckCircle2 size={13} className="shrink-0 mt-0.5" /> : <AlertCircle size={13} className="shrink-0 mt-0.5" />}
+                    <span>{result.message}</span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
         </div>
 

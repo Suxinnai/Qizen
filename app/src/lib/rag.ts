@@ -110,6 +110,62 @@ const SYNONYM_GROUPS = [
   ["估值", "误差估计", "近似估计"],
 ];
 
+const MIN_AUTO_SYNONYM_LENGTH = 3;
+const MAX_AUTO_SYNONYM_LENGTH = 12;
+const MIN_AUTO_SYNONYM_FREQ = 2;
+
+function extractAutoSynonymGroups(items: LibraryItem[]): string[][] {
+  const phraseFreq = new Map<string, number>();
+  const phraseSources = new Map<string, Set<string>>();
+
+  for (const item of items) {
+    const sources = [item.title, ...item.highlights, item.summary].filter(Boolean);
+    const combined = sources.join(" ");
+    const normalized = normalizeText(combined);
+    const cjkPhrases = normalized.match(/[一-鿿]{2,}/g) ?? [];
+
+    const seenInItem = new Set<string>();
+    for (const phrase of cjkPhrases) {
+      if (phrase.length < MIN_AUTO_SYNONYM_LENGTH || phrase.length > MAX_AUTO_SYNONYM_LENGTH) continue;
+      if (STOP_WORDS.has(phrase)) continue;
+      if (seenInItem.has(phrase)) continue;
+      seenInItem.add(phrase);
+      phraseFreq.set(phrase, (phraseFreq.get(phrase) ?? 0) + 1);
+      if (!phraseSources.has(phrase)) phraseSources.set(phrase, new Set());
+      phraseSources.get(phrase)!.add(item.id);
+    }
+  }
+
+  const candidates = Array.from(phraseFreq.entries())
+    .filter(([, freq]) => freq >= MIN_AUTO_SYNONYM_FREQ)
+    .map(([phrase]) => phrase);
+
+  if (candidates.length < 2) return [];
+
+  const groups: string[][] = [];
+  const used = new Set<string>();
+
+  for (const phrase of candidates) {
+    if (used.has(phrase)) continue;
+    const group = [phrase];
+    used.add(phrase);
+
+    for (const other of candidates) {
+      if (used.has(other)) continue;
+      if (other.includes(phrase) || phrase.includes(other)) {
+        group.push(other);
+        used.add(other);
+      }
+    }
+
+    if (group.length >= 2) {
+      groups.push(group);
+    }
+  }
+
+  return groups;
+}
+
 function normalizeText(text: string) {
   return text
     .toLowerCase()
@@ -122,9 +178,10 @@ function unique<T>(items: T[]) {
   return Array.from(new Set(items));
 }
 
-function getSynonymExpansions(term: string) {
+function getSynonymExpansions(term: string, autoGroups: string[][] = []) {
   const normalized = normalizeText(term);
-  const expansions = SYNONYM_GROUPS.filter((group) => group.some((item) => normalizeText(item).includes(normalized) || normalized.includes(normalizeText(item))))
+  const allGroups = [...SYNONYM_GROUPS, ...autoGroups];
+  const expansions = allGroups.filter((group) => group.some((item) => normalizeText(item).includes(normalized) || normalized.includes(normalizeText(item))))
     .flatMap((group) => group)
     .map((item) => normalizeText(item));
   return unique(expansions);
@@ -160,7 +217,7 @@ function tokenize(text: string, extraTerms: string[] = []) {
   );
 }
 
-function countMatches(text: string, terms: string[]) {
+function countMatches(text: string, terms: string[], idfWeights?: Map<string, number>) {
   const normalized = normalizeText(text);
   let score = 0;
   const matchedTerms: string[] = [];
@@ -168,7 +225,9 @@ function countMatches(text: string, terms: string[]) {
   for (const term of terms) {
     if (!term || normalized.length === 0) continue;
     if (normalized.includes(term)) {
-      score += term.length >= 6 ? 2.4 : term.length >= 4 ? 1.8 : 1;
+      const baseScore = term.length >= 6 ? 2.4 : term.length >= 4 ? 1.8 : 1;
+      const idfBoost = idfWeights?.get(term) ?? 1;
+      score += baseScore * idfBoost;
       matchedTerms.push(term);
     }
   }
@@ -226,7 +285,7 @@ function getNodeById(data: AppData, nodeId?: string): KnowledgeNode | undefined 
   return nodeId ? data.knowledgeGraph.nodes.find((node) => node.id === nodeId) : undefined;
 }
 
-function getNodeExpansionTerms(data: AppData, selectedNode?: KnowledgeNode) {
+function getNodeExpansionTerms(data: AppData, selectedNode: KnowledgeNode | undefined, autoGroups: string[][]) {
   if (!selectedNode) return [];
   const relatedLabels = data.knowledgeGraph.nodes
     .filter((node) => selectedNode.related.includes(node.id))
@@ -237,14 +296,14 @@ function getNodeExpansionTerms(data: AppData, selectedNode?: KnowledgeNode) {
     selectedNode.summary,
     selectedNode.studyHint,
     ...relatedLabels,
-    ...getSynonymExpansions(selectedNode.label),
+    ...getSynonymExpansions(selectedNode.label, autoGroups),
   ]);
 }
 
-function buildQueryTerms(data: AppData, query: string, selectedNode?: KnowledgeNode) {
+function buildQueryTerms(data: AppData, query: string, selectedNode: KnowledgeNode | undefined, autoGroups: string[][]) {
   const baseTerms = tokenize(query);
-  const synonymTerms = baseTerms.flatMap((term) => getSynonymExpansions(term));
-  const nodeTerms = getNodeExpansionTerms(data, selectedNode);
+  const synonymTerms = baseTerms.flatMap((term) => getSynonymExpansions(term, autoGroups));
+  const nodeTerms = getNodeExpansionTerms(data, selectedNode, autoGroups);
   const reformulatedTerms = [
     ...baseTerms,
     ...synonymTerms,
@@ -258,6 +317,32 @@ function buildQueryTerms(data: AppData, query: string, selectedNode?: KnowledgeN
   ];
 
   return unique(reformulatedTerms).sort((a, b) => b.length - a.length);
+}
+
+function buildIdfWeights(items: LibraryItem[], terms: string[]): Map<string, number> {
+  const weights = new Map<string, number>();
+  if (items.length === 0 || terms.length === 0) return weights;
+
+  for (const term of terms) {
+    if (!term || term.length < 2) continue;
+    const normalizedTerm = normalizeText(term);
+    let docCount = 0;
+    for (const item of items) {
+      const corpus = normalizeText(
+        [item.title, item.summary, item.preview, item.extractedText, ...item.highlights].join(" ")
+      );
+      if (corpus.includes(normalizedTerm)) {
+        docCount += 1;
+      }
+    }
+    if (docCount === 1) {
+      weights.set(term, 1.5);
+    } else if (docCount === 2) {
+      weights.set(term, 1.2);
+    }
+  }
+
+  return weights;
 }
 
 function buildReasonDetails(params: {
@@ -288,19 +373,21 @@ export function retrieveRelevantLibraryContext(
   options: RetrieveRelevantLibraryContextOptions = {}
 ): LibraryRagResult {
   const selectedNode = getNodeById(data, options.nodeId);
-  const queryTerms = buildQueryTerms(data, query, selectedNode);
+  const autoSynonymGroups = extractAutoSynonymGroups(data.libraryItems);
+  const queryTerms = buildQueryTerms(data, query, selectedNode, autoSynonymGroups);
+  const idfWeights = buildIdfWeights(data.libraryItems, queryTerms);
   const topK = options.topK ?? 3;
   const minScore = options.minScore ?? 2.6;
 
   const results = data.libraryItems
     .map<LibraryRagMatch | null>((item) => {
-      const titleMatches = countMatches(item.title, queryTerms);
-      const summaryMatches = countMatches(item.summary, queryTerms);
-      const previewMatches = countMatches(item.preview, queryTerms);
-      const extractedMatches = countMatches(item.extractedText, queryTerms);
+      const titleMatches = countMatches(item.title, queryTerms, idfWeights);
+      const summaryMatches = countMatches(item.summary, queryTerms, idfWeights);
+      const previewMatches = countMatches(item.preview, queryTerms, idfWeights);
+      const extractedMatches = countMatches(item.extractedText, queryTerms, idfWeights);
       const highlightMatches = item.highlights.reduce(
         (acc, highlight) => {
-          const matches = countMatches(highlight, queryTerms);
+          const matches = countMatches(highlight, queryTerms, idfWeights);
           acc.score += matches.score;
           acc.matchedTerms.push(...matches.matchedTerms);
           return acc;
@@ -310,19 +397,21 @@ export function retrieveRelevantLibraryContext(
 
       const isCurrentResource = Boolean(options.resourceId && item.id === options.resourceId);
       const isCurrentNodeLinked = Boolean(options.nodeId && item.linkedNodeIds.includes(options.nodeId));
+      const nodeExpansionTerms = getNodeExpansionTerms(data, selectedNode, autoSynonymGroups);
       const nodeLabelMatches = selectedNode
         ? countMatches(
             [item.title, item.summary, item.preview, item.extractedText, ...item.highlights].join(" "),
-            tokenize(getNodeExpansionTerms(data, selectedNode).join(" "))
+            tokenize(nodeExpansionTerms.join(" ")),
+            idfWeights
           )
         : { score: 0, matchedTerms: [] as string[] };
 
       let score =
-        titleMatches.score * 4.4 +
-        summaryMatches.score * 3.1 +
+        titleMatches.score * 3.0 +
+        summaryMatches.score * 3.5 +
         highlightMatches.score * 3 +
         previewMatches.score * 1.8 +
-        extractedMatches.score * 1.9 +
+        extractedMatches.score * 2.5 +
         nodeLabelMatches.score * 1.6;
 
       const reasons: string[] = [];
