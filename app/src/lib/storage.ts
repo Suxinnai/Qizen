@@ -39,6 +39,7 @@ export interface AppSettings {
   pomodoroMinutes: number;
   preferredStyle: TeachingStyle;
   remindersEnabled: boolean;
+  autoOpenStudyPanels: boolean;
   autoStartPomodoro: boolean;
   autoAppendNote: boolean;
   autoGenerateSessionTitle: boolean;
@@ -51,7 +52,7 @@ export interface AppSettings {
   llm: LlmProviderConfig;
 }
 
-export type StudySessionEventType = "ask" | "practice-generated";
+export type StudySessionEventType = "ask" | "practice-generated" | "practice-completed" | "progress-updated";
 
 export interface LlmAnswerRecord {
   usedRealModel: boolean;
@@ -66,8 +67,12 @@ export interface StudySessionEvent {
   question: string;
   resourceId: string | null;
   nodeId: string | null;
+  taskId?: string | null;
   hitResourceTitles: string[];
   generatedPractice: boolean;
+  practiceScore?: number;
+  practiceQuestionCount?: number;
+  progressAction?: "task-completed" | "node-reviewed" | "blocked";
   llm: LlmAnswerRecord;
 }
 
@@ -225,11 +230,13 @@ export interface UploadableFile {
 }
 
 const STORAGE_KEY = "qizen:mvp:v2";
+const LEGACY_LLM_SECRET_STORAGE_KEY = "qizen:secret:llm-api-key";
 
 const defaultSettings: AppSettings = {
   pomodoroMinutes: 25,
   preferredStyle: "analogy",
   remindersEnabled: true,
+  autoOpenStudyPanels: true,
   autoStartPomodoro: true,
   autoAppendNote: true,
   autoGenerateSessionTitle: true,
@@ -293,14 +300,14 @@ function seedGoals(): Goal[] {
           tasks: [
             {
               id: "task-math-1",
-              title: "复习《人类简史》第 4 章",
+              title: "理解拉格朗日中值定理及其几何意义",
               meta: "约 25 分钟 · 阅读",
               estimatedMinutes: 25,
-              done: true,
+              done: false,
             },
             {
               id: "task-math-2",
-              title: "完成线性代数练习册 P12-15",
+              title: "对比罗尔定理与拉格朗日中值定理",
               meta: "约 40 分钟 · 练习",
               estimatedMinutes: 40,
               done: false,
@@ -314,7 +321,7 @@ function seedGoals(): Goal[] {
           tasks: [
             {
               id: "task-math-3",
-              title: "整理产品设计课堂笔记",
+              title: "完成导数应用基础题",
               meta: "约 15 分钟 · 笔记",
               estimatedMinutes: 15,
               done: false,
@@ -660,6 +667,26 @@ function canUseStorage() {
   return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
 }
 
+function stripSensitiveSettings(settings: AppSettings): AppSettings {
+  return {
+    ...settings,
+    llm: {
+      ...settings.llm,
+      apiKey: "",
+    },
+  };
+}
+
+function stripSensitiveData(data: AppData): AppData {
+  if (canUseStorage() && data.settings.llm.apiKey.trim()) {
+    window.localStorage.setItem(LEGACY_LLM_SECRET_STORAGE_KEY, data.settings.llm.apiKey.trim());
+  }
+  return {
+    ...data,
+    settings: stripSensitiveSettings(data.settings),
+  };
+}
+
 function normalizeLibraryItem(item: Partial<LibraryItem>): LibraryItem {
   const originalFileName = item.originalFileName ?? item.title ?? "未命名资料";
   const sizeBytes = typeof item.sizeBytes === "number" ? item.sizeBytes : 0;
@@ -733,7 +760,7 @@ export function loadAppData(): AppData {
 
 export function saveAppData(data: AppData) {
   if (!canUseStorage()) return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(stripSensitiveData(data)));
 }
 
 export function updateAppData(updater: (data: AppData) => AppData) {

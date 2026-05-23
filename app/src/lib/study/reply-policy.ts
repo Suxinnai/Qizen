@@ -46,8 +46,12 @@ export function buildAssistantReply(params: {
   const { query, style, selectedResourceTitle, selectedNodeLabel, rag } = params;
   if (isNonLearningChat(query)) {
     return [
+      "## 我能帮你做什么",
       "我是栖知学习空间里的 AI 学习助手，主要负责陪你拆知识点、找资料依据、整理笔记、安排练习和推进学习路径。",
-      "这类问题不会触发资料库检索，所以我不会把无关资料硬塞成依据。你可以直接问我一个知识点，或者从目标、资料库、笔记里带上下文进来学。",
+      "- 解释概念、定理和例题",
+      "- 从资料库里找依据",
+      "- 把回答整理成可复习的笔记",
+      "- 根据当前上下文生成练习",
     ].join("\n\n");
   }
   const top = rag.results[0];
@@ -57,24 +61,31 @@ export function buildAssistantReply(params: {
 
   if (!top) {
     return [
-      `${contextLead}，但这次没有检索到能直接支撑「${query}」的本地资料片段。`,
-      "按学习空间的设计，没命中资料时本来应该继续走大模型的通用知识回答，而不是被资料库卡死。",
-      `所以在当前这个兜底分支里，我不应该硬套固定话术来答你。${selectedNodeLabel ? `如果你其实是在继续学「${selectedNodeLabel}」，可以把问题问得更具体一点；` : ""}你也可以直接新开一个学习会话换题。`,
+      "## 这次没有命中本地资料",
+      `${contextLead}，但没有检索到能直接支撑「${query}」的片段。`,
+      "> 没有命中资料时，我不会把无关内容硬塞成依据。配置模型后，这里会继续给出通用知识回答。",
+      selectedNodeLabel
+        ? `如果你是在继续学「${selectedNodeLabel}」，可以把问题问得更具体一点。`
+        : "你可以继续补充主题、上传资料，或直接新开一个学习会话换题。",
     ].join("\n\n");
   }
 
   const secondary = rag.results[1];
   const explanationParts = [
+    "## 结论",
     `${contextLead}${selectedNodeLabel ? `，并优先考虑「${selectedNodeLabel}」这个节点` : ""}。`,
-    buildEvidenceLine(top),
-    `从命中的片段来看，${top.matchedSnippet}`,
+    "## 依据",
+    `- ${buildEvidenceLine(top)}`,
+    `- 命中片段：${top.matchedSnippet}`,
+    "## 解释",
     `结合你的问题「${query}」，更贴近资料本身的理解是：${top.matchedSummary}`,
   ];
 
   if (top.matchedHighlights.length > 0) {
-    explanationParts.push(`这份资料当前最值得抓住的重点是：${top.matchedHighlights.join("；")}。`);
+    explanationParts.push(`重点可以先抓住：${top.matchedHighlights.join("；")}。`);
   }
 
+  explanationParts.push("## 下一步");
   explanationParts.push(`我会继续用${STYLE_LABELS[style]}方式帮你消化：${STYLE_RESPONSES[style]}`);
 
   if (secondary) {
@@ -82,8 +93,33 @@ export function buildAssistantReply(params: {
   }
 
   if (!rag.sufficient) {
-    explanationParts.push("不过这次检索到的依据还不算特别强，资料库没有明确依据，以下解释可能不够准确。你最好结合原文片段一起看。");
+    explanationParts.push("> 这次检索依据还不算强。最好结合原文片段一起看。");
   }
 
   return explanationParts.join("\n\n");
+}
+
+export function isStudyPlanRequest(query: string) {
+  return /学习计划|学习安排|怎么学|如何学|三步|路线/.test(query);
+}
+
+export function buildContextStudyPlan(params: {
+  selectedResourceTitle?: string;
+  selectedNodeLabel?: string;
+  selectedTaskTitle?: string;
+  style: TeachingStyle;
+}) {
+  const target =
+    params.selectedResourceTitle ??
+    params.selectedNodeLabel ??
+    params.selectedTaskTitle ??
+    "当前主题";
+
+  return [
+    `## 「${target}」轻量学习计划`,
+    "1. 先建立边界：用 5 分钟确认定义、适用条件和不适用场景。",
+    "2. 再连接证据：如果当前有资料命中，就优先回看资料片段；没有命中时先用通用解释建立框架。",
+    "3. 最后做小验证：生成一组练习，答完后再决定是否推进任务或节点。",
+    `> 当前讲解风格会继续按${STYLE_LABELS[params.style]}来组织。这个计划只作为本轮回复展示，不会自动改你的目标进度。`,
+  ].join("\n\n");
 }

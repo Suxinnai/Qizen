@@ -10,9 +10,12 @@ import {
   Settings,
   UserRound,
   BarChart3,
+  ChevronDown,
+  Inbox,
   PanelLeft,
   MessagesSquare,
-  Plus,
+  Search,
+  SquarePen,
 } from "lucide-react";
 import clsx from "clsx";
 import { Leaf } from "./icons/Leaf";
@@ -72,55 +75,64 @@ export function Sidebar() {
   }, []);
 
   const shouldShowSessions = isStudyPage && mode === "sessions";
-  const headerTitle = shouldShowSessions ? "会话" : "栖知";
-  const headerIcon = shouldShowSessions ? <MessagesSquare size={18} /> : <Leaf size={26} stroke="#2D7A6B" />;
+  const sessionCount = Math.min(sessions.length, 99);
 
   const sessionItems = useMemo(() => sessions.slice(0, 30), [sessions]);
 
   return (
     <aside className="qz-sidebar">
-      <div className="flex items-center justify-between gap-2 px-2 pt-1 pb-4">
-        <div className="flex items-center gap-2 min-w-0">
-          {headerIcon}
-          <span className="font-serif text-[20px] tracking-wide text-qz-primary dark:text-qz-light truncate">
-            {headerTitle}
-          </span>
+      <div className="qz-sidebar-toolbar">
+        <div className="qz-sidebar-brand">
+          <Leaf size={25} stroke="#2F7D71" />
+          <span>栖知</span>
         </div>
+
+        <button type="button" className="qz-sidebar-icon-button" title="搜索">
+          <Search size={17} />
+        </button>
+
         {isStudyPage ? (
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => {
-                const next = mode === "menu" ? "sessions" : "menu";
-                setMode(next);
-                setStudySidebarMode(next);
-              }}
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-qz-text-muted hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-              title={mode === "menu" ? "切换到会话列表" : "切换到主菜单"}
-            >
-              {mode === "menu" ? <MessagesSquare size={16} /> : <PanelLeft size={16} />}
-            </button>
-            {shouldShowSessions ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveStudyConversationId(null);
-                  window.dispatchEvent(new CustomEvent("qizen-study-start-new"));
-                }}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-qz-text-muted hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-                title="新建会话"
-              >
-                <Plus size={16} />
-              </button>
-            ) : null}
-          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const next = mode === "menu" ? "sessions" : "menu";
+              setMode(next);
+              setStudySidebarMode(next);
+            }}
+            className="qz-sidebar-icon-button"
+            title={mode === "menu" ? "切换到会话列表" : "切换到主菜单"}
+          >
+            {mode === "menu" ? <MessagesSquare size={17} /> : <PanelLeft size={17} />}
+          </button>
+        ) : null}
+
+        {isStudyPage ? (
+          <button
+            type="button"
+            onClick={() => {
+              setActiveStudyConversationId(null);
+              window.dispatchEvent(new CustomEvent("qizen-study-start-new"));
+            }}
+            className="qz-sidebar-icon-button"
+            title="新建会话"
+          >
+            <SquarePen size={17} />
+          </button>
         ) : null}
       </div>
 
       {shouldShowSessions ? (
         <div className="flex-1 min-h-0 flex flex-col">
-          <div className="px-2 pb-2 text-[11px] text-qz-text-muted">最近学习会话</div>
-          <div className="flex-1 overflow-y-auto space-y-1 pr-1">
+          <div className="qz-sidebar-status">
+            <div className="qz-sidebar-section-label">状态</div>
+            <button type="button" className="qz-mailbox-row">
+              <ChevronDown size={14} />
+              <Inbox size={17} />
+              <span className="flex-1">收件箱</span>
+              <span className="qz-mailbox-count">{sessionCount}</span>
+            </button>
+          </div>
+          <div className="qz-session-list">
             {sessionItems.length > 0 ? (
               sessionItems.map((session) => {
                 const active = session.id === activeConversationId;
@@ -133,13 +145,13 @@ export function Sidebar() {
                       setActiveConversationIdState(session.id);
                     }}
                     className={clsx(
-                      "w-full text-left rounded-[14px] px-3 py-2.5 transition-colors",
+                      "qz-session-item",
                       active
-                        ? "bg-qz-primary/8 text-qz-primary"
-                        : "hover:bg-black/[0.04] dark:hover:bg-white/[0.05] text-qz-text-strong dark:text-qz-text-dark"
+                        ? "qz-session-item-active"
+                        : "text-qz-text-strong dark:text-qz-text-dark"
                     )}
                   >
-                    <div className="truncate text-[13px] font-medium">{session.title}</div>
+                    <div className="truncate">{session.title}</div>
                     <div className="mt-1 flex items-center justify-end gap-2 text-[11px] text-qz-text-muted">
                       <span className="shrink-0">{formatConversationTime(session.updatedAt)}</span>
                     </div>
@@ -148,7 +160,7 @@ export function Sidebar() {
               })
             ) : (
               <div className="px-3 py-4 text-[12px] text-qz-text-muted leading-6">
-                还没有历史会话。点右上角加号，或者在学习空间里直接新建一个。
+                还没有历史会话。发送第一条消息后，会自动保存在这里。
               </div>
             )}
           </div>
@@ -171,7 +183,7 @@ export function Sidebar() {
         </nav>
       )}
 
-      <div className="flex-1" />
+      {!shouldShowSessions ? <div className="flex-1" /> : null}
 
       <div className="flex items-center gap-3 px-2 py-3 border-t border-black/5 dark:border-white/5">
         <div className="relative">

@@ -41,6 +41,7 @@ export interface PersistedStudyConversation {
 }
 
 interface StudyConversationStore {
+  schemaVersion: number;
   activeId: string | null;
   sidebarMode: StudySidebarMode;
   conversations: PersistedStudyConversation[];
@@ -48,6 +49,7 @@ interface StudyConversationStore {
 
 const STORAGE_KEY = "qizen:study:conversations:v1";
 const CHANGE_EVENT = "qizen-study-conversations-changed";
+const CURRENT_SCHEMA_VERSION = 2;
 
 function canUseStorage() {
   return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
@@ -64,6 +66,7 @@ export function getStudyConversationChangeEventName() {
 
 function defaultStore(): StudyConversationStore {
   return {
+    schemaVersion: CURRENT_SCHEMA_VERSION,
     activeId: null,
     sidebarMode: "menu",
     conversations: [],
@@ -101,8 +104,36 @@ function sanitizeConversation(item: PersistedStudyConversation): PersistedStudyC
 
   return {
     ...item,
-    title: sanitizePersistedText(item.title) || "新的学习会话",
+    context: item.context ?? null,
+    selectedTaskId: item.selectedTaskId ?? "",
+    teachingStyle: item.teachingStyle ?? "analogy",
+    noteDraft: sanitizePersistedText(item.noteDraft ?? ""),
+    title: sanitizePersistedText(item.title ?? "") || "新建学习会话",
     messages: cleanMessages,
+  };
+}
+
+function migrateStudyConversationStore(parsed: Partial<StudyConversationStore>): StudyConversationStore {
+  const conversations = Array.isArray(parsed.conversations)
+    ? parsed.conversations
+        .filter(
+          (item): item is PersistedStudyConversation =>
+            Boolean(item && typeof item === "object" && typeof item.id === "string")
+        )
+        .map(sanitizeConversation)
+        .filter((item) => item.messages.length > 0)
+    : [];
+
+  const activeId =
+    typeof parsed.activeId === "string" && conversations.some((conversation) => conversation.id === parsed.activeId)
+      ? parsed.activeId
+      : null;
+
+  return {
+    schemaVersion: CURRENT_SCHEMA_VERSION,
+    activeId,
+    sidebarMode: parsed.sidebarMode === "sessions" ? "sessions" : "menu",
+    conversations,
   };
 }
 
@@ -112,18 +143,7 @@ function readStore(): StudyConversationStore {
   if (!raw) return defaultStore();
   try {
     const parsed = JSON.parse(raw) as Partial<StudyConversationStore>;
-    const store = {
-      activeId: typeof parsed.activeId === "string" ? parsed.activeId : null,
-      sidebarMode: parsed.sidebarMode === "sessions" ? "sessions" : "menu",
-      conversations: Array.isArray(parsed.conversations)
-        ? parsed.conversations
-            .filter(
-              (item): item is PersistedStudyConversation =>
-                Boolean(item && typeof item === "object" && typeof item.id === "string")
-            )
-            .map(sanitizeConversation)
-        : [],
-    } satisfies StudyConversationStore;
+    const store = migrateStudyConversationStore(parsed);
 
     if (JSON.stringify(store) !== raw) {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
@@ -137,7 +157,7 @@ function readStore(): StudyConversationStore {
 
 function writeStore(store: StudyConversationStore) {
   if (!canUseStorage()) return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...store, schemaVersion: CURRENT_SCHEMA_VERSION }));
   emitChange();
 }
 
@@ -175,7 +195,7 @@ export function createStudyConversation(
   const now = new Date().toISOString();
   const conversation: PersistedStudyConversation = {
     ...input,
-    title: sanitizePersistedText(input.title) || "新的学习会话",
+    title: sanitizePersistedText(input.title) || "新建学习会话",
     messages: input.messages.map((message) => ({ ...message, content: sanitizePersistedText(message.content) })),
     id: `study-conv-${Date.now()}`,
     createdAt: now,
@@ -213,14 +233,14 @@ export function buildStudyConversationTitle(input: {
   const firstAssistantMessage = sanitizePersistedText(input.firstAssistantMessage ?? "");
   if (firstAssistantMessage) return firstAssistantMessage.slice(0, 24);
 
-  return input.isFreeConversation ? "新的自由会话" : "新的学习会话";
+  return input.isFreeConversation ? "新建对话" : "新建学习会话";
 }
 
 export function upsertStudyConversation(conversation: PersistedStudyConversation) {
   const store = readStore();
   const nextConversation: PersistedStudyConversation = {
     ...conversation,
-    title: sanitizePersistedText(conversation.title) || "新的学习会话",
+    title: sanitizePersistedText(conversation.title) || "新建学习会话",
     messages: conversation.messages.map((message) => ({
       ...message,
       content: sanitizePersistedText(message.content),

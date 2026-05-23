@@ -10,7 +10,7 @@
 ### 1. 桌面端基础
 | 层 | 当前技术 | 状态 |
 |---|---|---|
-| 桌面框架 | `Tauri 2` | ✅ 已落地 |
+| 桌面框架 | `Electron` | ✅ 已落地 |
 | 前端框架 | `React 19` | ✅ 已落地 |
 | 语言 | `TypeScript` | ✅ 已落地 |
 | 路由 | `react-router-dom` | ✅ 已落地 |
@@ -93,7 +93,8 @@ qizhi/
    │     ├─ llm.ts
    │     ├─ rag.ts
    │     └─ storage.ts
-   └─ src-tauri/
+   ├─ electron/
+   └─ src-tauri/          # 历史 Tauri 壳层目录，当前 Electron 入口不依赖
 ```
 
 ---
@@ -158,7 +159,7 @@ qizhi/
 - `SQLite + Drizzle`
 - 向量数据库 / embedding 检索
 - 图片 OCR
-- 安全密钥存储（Tauri keychain / secure storage）
+- 安全密钥存储（当前 Electron IPC 文件存储；后续可升级系统 Keychain）
 - 长期记忆系统
 - 自适应推荐 / 自适应出题
 

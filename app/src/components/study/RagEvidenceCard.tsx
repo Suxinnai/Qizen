@@ -8,7 +8,7 @@ export function RagEvidenceCard({ rag }: { rag: LibraryRagResult }) {
   }
 
   return (
-    <div className="mt-4 rounded-[18px] border border-qz-primary/15 bg-qz-primary/6 px-4 py-4">
+    <div className="qz-rag-card">
       <div className="flex items-center justify-between gap-3 mb-3">
         <div>
           <div className="text-[12px] text-qz-primary font-medium">RAG 证据</div>
@@ -23,7 +23,7 @@ export function RagEvidenceCard({ rag }: { rag: LibraryRagResult }) {
 
       <div className="space-y-3">
         {displayRag.results.map((match) => (
-          <div key={match.resource.id} className="rounded-[14px] border border-black/[0.05] dark:border-white/[0.06] bg-white/70 dark:bg-black/10 px-3.5 py-3">
+          <div key={match.resource.id} className="qz-rag-item">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="text-[13px] text-qz-text-strong dark:text-qz-text-dark">{match.resource.title}</div>

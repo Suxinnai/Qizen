@@ -1,12 +1,9 @@
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-
+import { useEffect, useMemo, useState } from "react";
 import { testLlmConnection } from "../lib/llm";
+import { readLlmApiKey, resolveLlmProviderConfig, saveLlmApiKey } from "../lib/secretStore";
 import {
   getStudyInteractionCount,
   loadAppData,
-  modeLabel,
-  resetOnboarding,
   updateSettings,
   type LlmProviderType,
 } from "../lib/storage";
@@ -67,12 +64,32 @@ function ValueRow({ label, value, status }: { label: string; value: string; stat
 }
 
 export default function Settings() {
-  const navigate = useNavigate();
   const initial = useMemo(() => loadAppData(), []);
   const [settings, setSettings] = useState(initial.settings);
+  const [apiKeyDraft, setApiKeyDraft] = useState("");
+  const [hasSavedApiKey, setHasSavedApiKey] = useState(Boolean(initial.settings.llm.apiKey));
   const [studyInteractionCount] = useState(getStudyInteractionCount(initial));
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>({ kind: "idle" });
-  const profile = initial.learningProfile;
+
+  useEffect(() => {
+    let disposed = false;
+
+    async function loadSavedApiKey() {
+      if (initial.settings.llm.apiKey.trim()) {
+        await saveLlmApiKey(initial.settings.llm.apiKey);
+        updateSettings({ llm: { ...initial.settings.llm, apiKey: "" } });
+      }
+      const savedKey = await readLlmApiKey();
+      if (disposed) return;
+      setHasSavedApiKey(Boolean(savedKey?.trim() || initial.settings.llm.apiKey.trim()));
+      setSettings((prev) => ({ ...prev, llm: { ...prev.llm, apiKey: "" } }));
+    }
+
+    void loadSavedApiKey();
+    return () => {
+      disposed = true;
+    };
+  }, [initial.settings.llm]);
 
   function patch<K extends keyof typeof settings>(key: K, value: (typeof settings)[K]) {
     const next = { ...settings, [key]: value };
@@ -84,7 +101,11 @@ export default function Settings() {
   async function handleTestConnection() {
     if (connectionStatus.kind === "testing") return;
     setConnectionStatus({ kind: "testing" });
-    const result = await testLlmConnection(settings.llm);
+    const providerConfig = await resolveLlmProviderConfig({
+      ...settings.llm,
+      apiKey: apiKeyDraft.trim() || settings.llm.apiKey,
+    });
+    const result = await testLlmConnection(providerConfig);
     if (result.ok) {
       setConnectionStatus({ kind: "success", message: `连接成功：${result.providerLabel} 可用` });
       return;
@@ -92,65 +113,21 @@ export default function Settings() {
     setConnectionStatus({ kind: "error", message: result.errorSummary ?? "连接失败，请检查配置" });
   }
 
+  async function handleApiKeyChange(value: string) {
+    setApiKeyDraft(value);
+    setConnectionStatus({ kind: "idle" });
+    await saveLlmApiKey(value);
+    setHasSavedApiKey(Boolean(value.trim()));
+    updateSettings({ llm: { ...settings.llm, apiKey: "" } });
+    setSettings((prev) => ({ ...prev, llm: { ...prev.llm, apiKey: "" } }));
+  }
+
   return (
     <div className="h-full overflow-y-auto">
       <div className="p-8 max-w-[1120px] mx-auto flex flex-col gap-6">
         <div>
-          <h1 className="font-serif text-[34px] text-qz-primary mb-2">设置</h1>
-          <p className="font-serif italic text-[14px] text-qz-text-muted">把学习空间真正调成适合你的样子</p>
-        </div>
-
-        <div className="qz-card">
-          <div className="flex items-center justify-between mb-5 gap-4">
-            <div>
-              <h2 className="font-serif text-[24px] text-qz-text-strong dark:text-qz-text-dark">用户学习画像</h2>
-              <p className="text-[12px] text-qz-text-muted mt-1">稳定字段 + 动态字段，一起决定学习空间怎么配合你。</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                resetOnboarding();
-                navigate("/onboarding");
-              }}
-              className="px-4 py-2 rounded-[12px] border border-black/[0.08] dark:border-white/[0.1] text-[12px] hover:bg-black/[0.04] dark:hover:bg-white/[0.05]"
-            >
-              重新测试
-            </button>
-          </div>
-
-          {profile ? (
-            <div className="grid md:grid-cols-[1.1fr,1fr] gap-6">
-              <div className="space-y-4">
-                {Object.entries(profile.scores).map(([key, value]) => (
-                  <div key={key}>
-                    <div className="flex items-center justify-between text-[13px] mb-2">
-                      <span>{modeLabel(key as keyof typeof profile.scores)}</span>
-                      <span className="text-qz-text-muted">{value} / 8</span>
-                    </div>
-                    <div className="h-3 rounded-full bg-black/5 dark:bg-white/5 overflow-hidden">
-                      <div className="h-full bg-gradient-to-r from-qz-primary to-qz-light" style={{ width: `${(value / 8) * 100}%` }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="space-y-4">
-                <div className="rounded-[18px] bg-qz-primary/6 p-4">
-                  <div className="font-serif text-[22px] text-qz-primary mb-2">{modeLabel(profile.dominantMode)}型学习者</div>
-                  <p className="text-[13px] text-qz-text-muted leading-7">{profile.summary}</p>
-                </div>
-                <div>
-                  <div className="font-serif text-[18px] text-qz-text-strong dark:text-qz-text-dark mb-2">推荐策略</div>
-                  <ul className="space-y-2 text-[13px] text-qz-text-muted">
-                    {profile.teachingStrategies.map((item) => (
-                      <li key={item}>• {item}</li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <p className="text-[13px] text-qz-text-muted">还没有学习画像，请先完成测试。</p>
-          )}
+          <h1 className="text-[28px] font-semibold text-qz-text-strong dark:text-qz-text-dark mb-2">设置</h1>
+          <p className="text-[14px] text-qz-text-muted">管理模型、自动化行为和本地数据策略。</p>
         </div>
 
         <div className="qz-card space-y-5">
@@ -205,11 +182,14 @@ export default function Settings() {
                   </div>
                   <input
                     type="password"
-                    value={settings.llm.apiKey}
-                    onChange={(e) => patch("llm", { ...settings.llm, apiKey: e.target.value })}
-                    placeholder="输入后仅保存在本地"
+                    value={apiKeyDraft}
+                    onChange={(e) => void handleApiKeyChange(e.target.value)}
+                    placeholder={hasSavedApiKey ? "已保存密钥；留空则继续使用已保存值" : "输入后从主数据中分离保存"}
                     className="w-full rounded-[10px] border border-black/[0.08] dark:border-white/[0.1] bg-transparent px-3 py-2 text-[13px] outline-none"
                   />
+                  <div className="mt-2 text-[11px] text-qz-text-muted">
+                    状态：{hasSavedApiKey ? "已保存密钥，不写入主 localStorage 数据" : "未保存密钥，将使用本地回答 fallback"}
+                  </div>
                 </label>
 
                 <ValueRow label="Agent / 后台任务模型" value="claude-haiku-4（规划值）" status="规划中" />
@@ -235,10 +215,10 @@ export default function Settings() {
               <div className="font-serif text-[20px] text-qz-text-strong dark:text-qz-text-dark mb-3">自动化行为</div>
               <div className="space-y-3">
                 <ToggleRow label="AI 自动启动番茄钟" checked={settings.autoStartPomodoro} onChange={(value) => patch("autoStartPomodoro", value)} />
+                <ToggleRow label="AI 自动打开学习面板" checked={settings.autoOpenStudyPanels} onChange={(value) => patch("autoOpenStudyPanels", value)} />
                 <ToggleRow label="AI 自动写入笔记" checked={settings.autoAppendNote} onChange={(value) => patch("autoAppendNote", value)} />
                 <ToggleRow label="会话结束后生成标题" checked={settings.autoGenerateSessionTitle} onChange={(value) => patch("autoGenerateSessionTitle", value)} />
                 <ToggleRow label="会话结束后整理笔记" checked={settings.autoSummarizeSessionNote} onChange={(value) => patch("autoSummarizeSessionNote", value)} status="规划中" />
-                <ToggleRow label="学习画像自动更新" checked={settings.autoUpdateLearningProfile} onChange={(value) => patch("autoUpdateLearningProfile", value)} status="规划中" />
                 <label className="block rounded-[14px] border border-black/[0.05] dark:border-white/[0.08] px-4 py-3">
                   <div className="text-[14px] text-qz-text-strong dark:text-qz-text-dark mb-2">run_terminal 需用户确认</div>
                   <select
@@ -304,7 +284,7 @@ export default function Settings() {
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <div className="text-[14px] text-rose-700 dark:text-rose-300">危险操作</div>
-                      <div className="text-[12px] text-qz-text-muted mt-1">清理会话历史、清除学习画像、导出数据和重置本地数据将在数据管理页接入；这里先禁用，避免误触。</div>
+                      <div className="text-[12px] text-qz-text-muted mt-1">清理会话历史、导出数据和重置本地数据将在数据管理页接入；这里先禁用，避免误触。</div>
                     </div>
                     <button type="button" disabled className="px-3 py-1.5 rounded-full bg-rose-500/10 text-rose-700 dark:text-rose-300 text-[11px] cursor-not-allowed">
                       规划中

@@ -77,7 +77,13 @@ export function PracticeEvidencePanel({ evidence }: { evidence?: PracticeQuestio
   );
 }
 
-export function PracticePanel({ practice }: { practice: RagPracticeSet | null }) {
+export function PracticePanel({
+  practice,
+  onComplete,
+}: {
+  practice: RagPracticeSet | null;
+  onComplete?: () => void;
+}) {
   const [expandedQuestionIds, setExpandedQuestionIds] = useState<string[]>([]);
 
   if (!practice) return null;
@@ -136,6 +142,15 @@ export function PracticePanel({ practice }: { practice: RagPracticeSet | null })
           );
         })}
       </div>
+      {onComplete ? (
+        <button
+          type="button"
+          onClick={onComplete}
+          className="mt-4 w-full h-9 rounded-full bg-qz-primary text-white text-[12px] hover:bg-qz-dark transition-colors"
+        >
+          标记本组练习已完成
+        </button>
+      ) : null}
     </div>
   );
 }

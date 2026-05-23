@@ -75,6 +75,8 @@ function buildSystemPrompt(params: GenerateStudyAnswerParams) {
     `当前用户画像：${profileText}。`,
     selectedResourceTitle ? `当前上下文资料：${selectedResourceTitle}。` : "",
     selectedNodeLabel ? `当前知识节点：${selectedNodeLabel}。` : "",
+    "Markdown 输出要求：使用清晰的 Markdown，而不是大段散文。优先使用 `##` 小标题、短段落、项目符号、编号步骤、引用块和行内代码。只有代码或命令才使用代码块。",
+    "阅读体验要求：每段尽量 1-3 句；先给结论，再给依据和下一步；避免过度加粗，不要输出表情符号。",
     "回答要求：1) 先直接回答用户问题；2) 如果有资料证据，再单独指出依据；3) 如果没有资料证据，就用自然中文说明这是通用知识解释；4) 不要因为没有命中资料就拒答。",
   ]
     .filter(Boolean)

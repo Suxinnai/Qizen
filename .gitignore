@@ -35,3 +35,4 @@ app/src-tauri/WixTools/
 
 # 临时
 .alma/
+.omx/

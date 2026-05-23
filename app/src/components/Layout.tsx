@@ -10,6 +10,8 @@ const PAGE_TITLES: Record<string, string> = {
   "/library": "资料库",
   "/graph": "知识图谱",
   "/notes": "笔记",
+  "/reports": "学习报告",
+  "/profile": "个人中心",
   "/settings": "设置",
 };
 
@@ -32,16 +34,16 @@ export function Layout() {
 
   return (
     <div className="qz-window">
-      <TitleBar
-        title={title}
-        isDark={isDark}
-        onToggleTheme={() => setIsDark((v) => !v)}
-      />
+      <Sidebar />
 
-      <div className="flex flex-1 min-h-0">
-        <Sidebar />
+      <div className="qz-shell">
+        <TitleBar
+          title={title}
+          isDark={isDark}
+          onToggleTheme={() => setIsDark((v) => !v)}
+        />
 
-        <main className="flex-1 min-w-0 bg-qz-bg dark:bg-qz-bg-dark relative">
+        <main className="qz-main">
           <Outlet />
         </main>
       </div>
