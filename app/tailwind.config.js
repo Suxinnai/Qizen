@@ -5,34 +5,42 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Windows-oriented desktop palette
+        // 栖知 DNA 配色
         qz: {
-          primary: "#0067C0",
-          light: "#7DA8D8",
-          dark: "#375A7F",
+          // 主色
+          primary: "#2D7A6B",     // 栖知青
+          light: "#5BA593",       // 浅栖知
+          dark: "#1A5448",        // 深栖知
 
-          bg: "#FFFFFF",
-          card: "#FFFFFF",
-          chrome: "#F5F7FA",
+          // 背景
+          bg: "#FBFAF7",          // 米白底
+          card: "#FFFFFF",        // 卡片白
+          chrome: "#E8E6E1",      // 窗口外层
 
-          "bg-dark": "#202020",
-          "card-dark": "#2B2B2B",
-          "chrome-dark": "#191919",
+          // 暗模式
+          "bg-dark": "#141413",
+          "card-dark": "#2A2A28",
+          "chrome-dark": "#0E0E0D",
 
-          text: "#2D333B",
-          "text-muted": "#7A8798",
-          "text-strong": "#1F2328",
+          // 文字
+          text: "#3A3833",
+          "text-muted": "#8A8478",
+          "text-strong": "#1A1916",
 
-          "text-dark": "#F5F5F5",
+          // 暗模式文字
+          "text-dark": "#DDD8CE",
 
-          divider: "#E8EDF3",
-          "divider-dark": "#3A3A3A",
+          // 分隔
+          divider: "#EFEDE8",
+          "divider-dark": "#2A2A28",
 
-          mastered: "#107C10",
-          learning: "#CA5010",
-          weak: "#D13438",
+          // 节点色
+          mastered: "#4CAF7C",
+          learning: "#E8A93C",
+          weak: "#D85959",
 
-          info: "#0078D4",
+          // 语义色
+          info: "#5B8DEF",
         },
       },
       fontFamily: {
@@ -40,22 +48,23 @@ export default {
         serif: ['"Cormorant Garamond"', '"Noto Serif SC"', "serif"],
         // 无衬线 - 用于 UI、正文
         sans: [
-          '"Segoe UI Variable"',
-          '"Segoe UI"',
-          '"Microsoft YaHei UI"',
-          '"Microsoft YaHei"',
+          "-apple-system",
+          "BlinkMacSystemFont",
+          '"SF Pro Text"',
+          '"PingFang SC"',
+          '"HarmonyOS Sans"',
           "system-ui",
           "sans-serif",
         ],
       },
       borderRadius: {
-        qz: "10px",
+        qz: "12px", // 卡片标准圆角
       },
       boxShadow: {
-        "qz-window": "0 12px 32px rgba(0,0,0,0.18)",
-        "qz-card": "0 1px 2px rgba(15,23,42,0.04)",
-        "qz-card-hover": "0 4px 14px rgba(15,23,42,0.06)",
-        "qz-float": "0 10px 24px rgba(15,23,42,0.12)",
+        "qz-window": "0 20px 60px rgba(0,0,0,0.15), 0 8px 16px rgba(0,0,0,0.08)",
+        "qz-card": "0 1px 3px rgba(0,0,0,0.04)",
+        "qz-card-hover": "0 4px 12px rgba(0,0,0,0.08)",
+        "qz-float": "0 12px 32px rgba(0,0,0,0.12)",
       },
       animation: {
         "ling-breath": "ling-breath 3s ease-in-out infinite",
