@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   GraduationCap,
@@ -8,13 +8,9 @@ import {
   Network,
   NotebookPen,
   Settings,
-  UserRound,
   BarChart3,
   ChevronDown,
-  Inbox,
-  PanelLeft,
   MessagesSquare,
-  Search,
   SquarePen,
 } from "lucide-react";
 import clsx from "clsx";
@@ -22,12 +18,9 @@ import { Leaf } from "./icons/Leaf";
 import {
   getActiveStudyConversationId,
   getStudyConversationChangeEventName,
-  getStudySidebarMode,
   listStudyConversations,
   setActiveStudyConversationId,
-  setStudySidebarMode,
   type PersistedStudyConversation,
-  type StudySidebarMode,
 } from "../lib/studyConversations";
 
 interface NavItem {
@@ -44,8 +37,6 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/graph", label: "知识图谱", icon: Network },
   { to: "/notes", label: "笔记", icon: NotebookPen },
   { to: "/reports", label: "学习报告", icon: BarChart3 },
-  { to: "/profile", label: "个人中心", icon: UserRound },
-  { to: "/settings", label: "设置", icon: Settings },
 ];
 
 function formatConversationTime(value: string) {
@@ -56,16 +47,15 @@ function formatConversationTime(value: string) {
 
 export function Sidebar() {
   const location = useLocation();
-  const isStudyPage = location.pathname === "/study";
-  const [mode, setMode] = useState<StudySidebarMode>(() => getStudySidebarMode());
+  const navigate = useNavigate();
   const [sessions, setSessions] = useState<PersistedStudyConversation[]>(() => listStudyConversations());
   const [activeConversationId, setActiveConversationIdState] = useState<string | null>(() =>
     getActiveStudyConversationId()
   );
+  const [isSessionsExpanded, setIsSessionsExpanded] = useState(true);
 
   useEffect(() => {
     const sync = () => {
-      setMode(getStudySidebarMode());
       setSessions(listStudyConversations());
       setActiveConversationIdState(getActiveStudyConversationId());
     };
@@ -74,68 +64,78 @@ export function Sidebar() {
     return () => window.removeEventListener(getStudyConversationChangeEventName(), sync);
   }, []);
 
-  const shouldShowSessions = isStudyPage && mode === "sessions";
-  const sessionCount = Math.min(sessions.length, 99);
-
   const sessionItems = useMemo(() => sessions.slice(0, 30), [sessions]);
+
+  const handleNewSession = () => {
+    setActiveStudyConversationId(null);
+    setActiveConversationIdState(null);
+    window.dispatchEvent(new CustomEvent("qizen-study-start-new"));
+    if (location.pathname !== "/study") {
+      navigate("/study");
+    }
+  };
 
   return (
     <aside className="qz-sidebar">
-      <div className="qz-sidebar-toolbar">
+      {/* 1. Logo 品牌行 (独占一行，坚决防止挤压) */}
+      <div className="qz-sidebar-brand-wrapper">
         <div className="qz-sidebar-brand">
           <Leaf size={25} stroke="#2F7D71" />
           <span>栖知</span>
         </div>
-
-        <button type="button" className="qz-sidebar-icon-button" title="搜索">
-          <Search size={17} />
-        </button>
-
-        {isStudyPage ? (
-          <button
-            type="button"
-            onClick={() => {
-              const next = mode === "menu" ? "sessions" : "menu";
-              setMode(next);
-              setStudySidebarMode(next);
-            }}
-            className="qz-sidebar-icon-button"
-            title={mode === "menu" ? "切换到会话列表" : "切换到主菜单"}
-          >
-            {mode === "menu" ? <MessagesSquare size={17} /> : <PanelLeft size={17} />}
-          </button>
-        ) : null}
-
-        {isStudyPage ? (
-          <button
-            type="button"
-            onClick={() => {
-              setActiveStudyConversationId(null);
-              window.dispatchEvent(new CustomEvent("qizen-study-start-new"));
-            }}
-            className="qz-sidebar-icon-button"
-            title="新建会话"
-          >
-            <SquarePen size={17} />
-          </button>
-        ) : null}
       </div>
 
-      {shouldShowSessions ? (
-        <div className="flex-1 min-h-0 flex flex-col">
-          <div className="qz-sidebar-status">
-            <div className="qz-sidebar-section-label">状态</div>
-            <button type="button" className="qz-mailbox-row">
-              <ChevronDown size={14} />
-              <Inbox size={17} />
-              <span className="flex-1">收件箱</span>
-              <span className="qz-mailbox-count">{sessionCount}</span>
-            </button>
-          </div>
+      {/* 2. 显眼的新建会话黄金入口 (胶囊按钮) */}
+      <div className="qz-sidebar-action-zone">
+        <button
+          type="button"
+          onClick={handleNewSession}
+          className="qz-btn-new-session"
+          title="新建学习会话"
+        >
+          <SquarePen size={14} />
+          <span>新建学习会话</span>
+        </button>
+      </div>
+
+      {/* 3. 主功能菜单导航 */}
+      <nav className="qz-sidebar-nav">
+        {NAV_ITEMS.map((item) => {
+          const Icon = item.icon;
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) => clsx("qz-nav-item", isActive && "active")}
+            >
+              <Icon size={16} />
+              <span>{item.label}</span>
+            </NavLink>
+          );
+        })}
+      </nav>
+
+      {/* 4. 最近学习会话 (折叠手风琴布局) */}
+      <div className="qz-sessions-accordion">
+        <button
+          type="button"
+          onClick={() => setIsSessionsExpanded(!isSessionsExpanded)}
+          className="qz-sessions-accordion-header"
+        >
+          <ChevronDown
+            size={14}
+            className={clsx("transition-transform duration-200 shrink-0", !isSessionsExpanded && "-rotate-90")}
+          />
+          <MessagesSquare size={14} className="shrink-0" />
+          <span className="flex-1 text-left truncate">最近学习会话</span>
+          {sessions.length > 0 && <span className="qz-sessions-badge">{sessions.length}</span>}
+        </button>
+
+        {isSessionsExpanded ? (
           <div className="qz-session-list">
             {sessionItems.length > 0 ? (
               sessionItems.map((session) => {
-                const active = session.id === activeConversationId;
+                const active = session.id === activeConversationId && location.pathname === "/study";
                 return (
                   <button
                     key={session.id}
@@ -143,6 +143,9 @@ export function Sidebar() {
                     onClick={() => {
                       setActiveStudyConversationId(session.id);
                       setActiveConversationIdState(session.id);
+                      if (location.pathname !== "/study") {
+                        navigate("/study");
+                      }
                     }}
                     className={clsx(
                       "qz-session-item",
@@ -152,52 +155,55 @@ export function Sidebar() {
                     )}
                   >
                     <div className="truncate">{session.title}</div>
-                    <div className="mt-1 flex items-center justify-end gap-2 text-[11px] text-qz-text-muted">
-                      <span className="shrink-0">{formatConversationTime(session.updatedAt)}</span>
+                    <div className="mt-0.5 flex items-center justify-end text-[10px] text-qz-text-muted">
+                      <span>{formatConversationTime(session.updatedAt)}</span>
                     </div>
                   </button>
                 );
               })
             ) : (
-              <div className="px-3 py-4 text-[12px] text-qz-text-muted leading-6">
-                还没有历史会话。发送第一条消息后，会自动保存在这里。
+              <div className="px-3.5 py-4 text-[11px] text-qz-text-muted leading-relaxed text-center">
+                暂无会话。发送消息后自动保存。
               </div>
             )}
           </div>
-        </div>
-      ) : (
-        <nav className="flex flex-col gap-1">
-          {NAV_ITEMS.map((item) => {
-            const Icon = item.icon;
-            return (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={({ isActive }) => clsx("qz-nav-item", isActive && "active")}
-              >
-                <Icon size={16} />
-                <span>{item.label}</span>
-              </NavLink>
-            );
-          })}
-        </nav>
-      )}
+        ) : null}
+      </div>
 
-      {!shouldShowSessions ? <div className="flex-1" /> : null}
-
-      <div className="flex items-center gap-3 px-2 py-3 border-t border-black/5 dark:border-white/5">
-        <div className="relative">
-          <div
-            className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[13px] font-medium"
-            style={{ background: "linear-gradient(135deg, #5BA593 0%, #2D7A6B 100%)" }}
+      {/* 5. 底部沉底区 (个人中心与设置快捷整合) */}
+      <div className="qz-sidebar-footer">
+        <div className="qz-sidebar-user-block">
+          <NavLink
+            to="/profile"
+            className={({ isActive }) =>
+              clsx("qz-sidebar-user-info-link", isActive && "active")
+            }
+            title="个人中心"
           >
-            沐
-          </div>
-          <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-qz-mastered border border-white dark:border-qz-bg-dark" />
-        </div>
-        <div className="flex flex-col leading-tight min-w-0">
-          <span className="text-[13px] text-qz-text-strong dark:text-qz-text-dark truncate">沐灵</span>
-          <span className="text-[11px] text-qz-mastered">在线</span>
+            <div className="relative shrink-0">
+              <div
+                className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[12px] font-semibold"
+                style={{ background: "linear-gradient(135deg, #5BA593 0%, #2D7A6B 100%)" }}
+              >
+                沐
+              </div>
+              <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-qz-mastered border border-white dark:border-qz-bg-dark" />
+            </div>
+            <div className="flex flex-col leading-tight min-w-0 flex-1">
+              <span className="text-[12.5px] font-semibold text-qz-text-strong dark:text-qz-text-dark truncate">沐灵</span>
+              <span className="text-[10px] text-qz-mastered font-medium">在线</span>
+            </div>
+          </NavLink>
+
+          <NavLink
+            to="/settings"
+            className={({ isActive }) =>
+              clsx("qz-btn-footer-settings", isActive && "active")
+            }
+            title="设置"
+          >
+            <Settings size={15} />
+          </NavLink>
         </div>
       </div>
     </aside>

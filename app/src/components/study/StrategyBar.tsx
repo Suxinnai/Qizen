@@ -1,10 +1,13 @@
 export function StrategyBar({ onUnderstood }: { onUnderstood: () => void }) {
   return (
     <div className="qz-strategy-bar">
+      <button type="button" className="qz-strategy-button qz-strategy-button-primary">
+        换种讲法
+      </button>
       <button type="button" className="qz-strategy-button">
         更深入
       </button>
-      <button type="button" onClick={onUnderstood} className="qz-strategy-button qz-strategy-button-primary">
+      <button type="button" onClick={onUnderstood} className="qz-strategy-button">
         我懂了
       </button>
       <button type="button" className="qz-strategy-button">
