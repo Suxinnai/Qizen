@@ -19,7 +19,7 @@ export default function Goals() {
             <h1 className="font-serif text-[34px] text-qz-primary mb-2">我的目标</h1>
             <p className="font-serif italic text-[14px] text-qz-text-muted">千里之行，始于栖叶</p>
           </div>
-          <button className="px-4 py-2 rounded-md bg-qz-primary text-white text-[13px] hover:bg-qz-dark transition-colors">
+          <button className="qz-btn-primary px-4 py-2 text-[13px]">
             新建目标
           </button>
         </div>
@@ -31,8 +31,10 @@ export default function Goals() {
               type="button"
               onClick={() => setSelectedGoalId(goal.id)}
               className={clsx(
-                "qz-card text-left relative overflow-hidden",
-                selectedGoalId === goal.id && "ring-2 ring-qz-primary/30"
+                "qz-card text-left relative overflow-hidden transition-all duration-300",
+                selectedGoalId === goal.id
+                  ? "!border-qz-primary shadow-[0_8px_24px_rgba(45,122,107,0.08)] bg-gradient-to-b from-qz-primary/[0.02] to-transparent"
+                  : "hover:border-qz-primary/30"
               )}
             >
               <div
@@ -94,7 +96,7 @@ export default function Goals() {
                           <button
                             type="button"
                             onClick={() => navigate("/study", { state: { source: "goal", taskId: task.id } })}
-                            className="text-[12px] px-3 py-1.5 rounded-full bg-qz-primary/10 text-qz-primary hover:bg-qz-primary/15 transition-colors"
+                            className="qz-btn-secondary text-[12px] px-3.5 py-1.5"
                           >
                             去学习
                           </button>

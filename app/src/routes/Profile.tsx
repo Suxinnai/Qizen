@@ -271,11 +271,11 @@ export default function Profile() {
             {/* 快捷入口 */}
             <div className="qz-card space-y-3">
               <div className="font-serif text-[22px] text-qz-text-strong dark:text-qz-text-dark mb-2">快捷入口</div>
-              <Link to="/reports" className="flex items-center gap-3 rounded-[14px] border border-black/[0.05] dark:border-white/[0.08] px-4 py-3 hover:bg-black/[0.03] dark:hover:bg-white/[0.04]">
+              <Link to="/reports" className="flex items-center gap-3 rounded-[14px] border border-black/[0.05] dark:border-white/[0.08] px-4 py-3 hover:border-qz-primary/30 hover:bg-[#E2F1EC]/15 hover:shadow-[0_2px_10px_rgba(45,122,107,0.03)] transition-all duration-300">
                 <BarChart3 size={16} className="text-qz-primary" />
                 <span className="text-[13px]">查看学习报告</span>
               </Link>
-              <Link to="/settings" className="flex items-center gap-3 rounded-[14px] border border-black/[0.05] dark:border-white/[0.08] px-4 py-3 hover:bg-black/[0.03] dark:hover:bg-white/[0.04]">
+              <Link to="/settings" className="flex items-center gap-3 rounded-[14px] border border-black/[0.05] dark:border-white/[0.08] px-4 py-3 hover:border-qz-primary/30 hover:bg-[#E2F1EC]/15 hover:shadow-[0_2px_10px_rgba(45,122,107,0.03)] transition-all duration-300">
                 <Settings size={16} className="text-qz-primary" />
                 <span className="text-[13px]">调整学习偏好</span>
               </Link>

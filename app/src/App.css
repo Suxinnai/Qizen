@@ -311,6 +311,64 @@ body {
   color: #FFFFFF;
 }
 
+.qz-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #2D7A6B 0%, #1A5448 100%);
+  color: #FFFFFF;
+  font-weight: 600;
+  border-radius: 9999px;
+  box-shadow: 0 4px 12px rgba(45, 122, 107, 0.15);
+  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  border: none;
+  cursor: pointer;
+}
+.qz-btn-primary:hover {
+  transform: translateY(-1.5px);
+  box-shadow: 0 6px 18px rgba(45, 122, 107, 0.25);
+  background: linear-gradient(135deg, #378F7E 0%, #206859 100%);
+}
+.qz-btn-primary:active {
+  transform: translateY(0);
+}
+
+.qz-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #E2F1EC;
+  color: #1A5C4A;
+  font-weight: 600;
+  border-radius: 9999px;
+  border: 1px solid rgba(45, 122, 107, 0.15);
+  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+.qz-btn-secondary:hover {
+  background: #D1EAE2;
+  border-color: #2D7A6B;
+  color: #124436;
+  transform: translateY(-1.5px);
+  box-shadow: 0 4px 12px rgba(45, 122, 107, 0.08);
+}
+.qz-btn-secondary:active {
+  transform: translateY(0);
+}
+
+.dark .qz-btn-secondary {
+  background: rgba(45, 122, 107, 0.15);
+  color: #5BA593;
+  border-color: rgba(91, 165, 147, 0.2);
+}
+.dark .qz-btn-secondary:hover {
+  background: rgba(45, 122, 107, 0.25);
+  color: #FFFFFF;
+  border-color: #5BA593;
+}
+
 .qz-sidebar-nav {
   display: flex;
   flex-direction: column;
@@ -524,15 +582,25 @@ body {
 }
 
 .qz-card {
-  @apply bg-qz-card dark:bg-qz-card-dark rounded-qz shadow-qz-card transition-colors duration-150;
-  border: 1px solid #e8edf3;
+  @apply bg-qz-card dark:bg-qz-card-dark rounded-qz transition-all;
+  transition-duration: 300ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1.5px solid #EFEDE8;
   padding: 20px;
+  box-shadow: 0 2px 8px rgba(45, 122, 107, 0.02);
 }
 .dark .qz-card {
   border-color: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 .qz-card:hover {
-  border-color: #dbe4ee;
+  border-color: #2D7A6B;
+  transform: translateY(-3px);
+  box-shadow: 0 10px 25px rgba(45, 122, 107, 0.08), 0 3px 8px rgba(45, 122, 107, 0.04);
+}
+.dark .qz-card:hover {
+  border-color: #5BA593;
+  box-shadow: 0 10px 25px rgba(91, 165, 147, 0.1), 0 3px 8px rgba(0, 0, 0, 0.2);
 }
 
 .qz-study {

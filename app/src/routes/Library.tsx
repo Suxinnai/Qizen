@@ -187,7 +187,7 @@ export default function Library() {
                 type="button"
                 onClick={handleUpload}
                 disabled={isUploading}
-                className="h-10 px-4 rounded-full bg-qz-primary text-white text-[13px] flex items-center gap-2 hover:bg-qz-dark transition-colors disabled:opacity-60"
+                className="qz-btn-primary h-10 px-4 text-[13px] flex items-center gap-2 disabled:opacity-60"
               >
                 {isUploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
                 {isUploading ? "正在解析…" : "上传并解析资料"}
@@ -254,9 +254,9 @@ export default function Library() {
                     type="button"
                     onClick={() => setFilter(item.key)}
                     className={clsx(
-                      "px-3 py-1.5 rounded-full text-[12px] transition-colors",
+                      "px-3 py-1.5 rounded-full text-[12px] transition-all",
                       filter === item.key
-                        ? "bg-qz-primary text-white"
+                        ? "bg-qz-primary text-white shadow-[0_2px_8px_rgba(45,122,107,0.2)] bg-gradient-to-r from-[#2D7A6B] to-[#1A5448] font-medium"
                         : "bg-black/[0.04] dark:bg-white/[0.06] text-qz-text-muted hover:bg-black/[0.06] dark:hover:bg-white/[0.1]"
                     )}
                   >
@@ -275,7 +275,7 @@ export default function Library() {
                   <button
                     type="button"
                     onClick={handleUpload}
-                    className="h-9 px-4 rounded-full bg-qz-primary text-white text-[12px] hover:bg-qz-dark"
+                    className="qz-btn-primary h-9 px-4 text-[12px]"
                   >
                     立即上传
                   </button>
@@ -290,10 +290,10 @@ export default function Library() {
                       type="button"
                       onClick={() => setSelectedId(item.id)}
                       className={clsx(
-                        "w-full text-left rounded-[18px] px-4 py-4 border transition-colors",
+                        "w-full text-left rounded-[18px] px-4 py-4 border transition-all duration-300",
                         active
-                          ? "bg-qz-primary/8 border-qz-primary/20"
-                          : "bg-white/70 dark:bg-black/15 border-black/5 dark:border-white/5 hover:bg-black/[0.03] dark:hover:bg-white/[0.03]"
+                          ? "bg-[#E2F1EC]/40 dark:bg-[rgba(45,122,107,0.12)] border-[#2D7A6B] shadow-[0_4px_12px_rgba(45,122,107,0.04)] font-medium"
+                          : "bg-white/70 dark:bg-black/15 border-black/5 dark:border-white/5 hover:border-black/[0.1] dark:hover:border-white/[0.1] hover:bg-white dark:hover:bg-black/25 hover:shadow-[0_2px_8px_rgba(0,0,0,0.01)]"
                       )}
                     >
                       <div className="flex items-start gap-3">
@@ -410,7 +410,7 @@ export default function Library() {
                           },
                         })
                       }
-                      className="w-full h-10 rounded-full bg-qz-primary text-white text-[13px] hover:bg-qz-dark transition-colors"
+                      className="qz-btn-primary w-full h-10 text-[13px]"
                     >
                       带着这份资料去学习空间
                     </button>

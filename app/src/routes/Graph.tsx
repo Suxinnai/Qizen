@@ -246,7 +246,7 @@ export default function Graph() {
                   <button
                     type="button"
                     onClick={() => navigateToStudy(activeNode.id)}
-                    className="w-full h-10 rounded-full bg-qz-primary text-white text-[13px] hover:bg-qz-dark transition-colors"
+                    className="qz-btn-primary w-full h-10 text-[13px]"
                   >
                     去学习空间继续学这个
                   </button>
@@ -264,7 +264,7 @@ export default function Graph() {
                       key={node.id}
                       type="button"
                       onClick={() => setActiveNodeId(node.id)}
-                      className="w-full text-left rounded-[16px] border border-black/5 dark:border-white/5 px-4 py-3 hover:bg-black/[0.02] dark:hover:bg-white/[0.03] transition-colors"
+                      className="w-full text-left rounded-[16px] border border-black/5 dark:border-white/5 px-4 py-3 hover:border-qz-primary/30 hover:bg-[#E2F1EC]/10 transition-all duration-300"
                     >
                       <div className="flex items-center gap-2 mb-1">
                         <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: stateColor(node.state) }} />
@@ -292,7 +292,7 @@ export default function Graph() {
                       key={node.id}
                       type="button"
                       onClick={() => navigateToStudy(node.id)}
-                      className="w-full text-left rounded-[16px] border border-qz-primary/15 bg-qz-primary/[0.03] px-4 py-3.5 hover:bg-qz-primary/[0.08] transition-colors group"
+                      className="w-full text-left rounded-[16px] border border-qz-primary/20 bg-qz-primary/[0.03] px-4 py-3.5 hover:border-qz-primary hover:bg-qz-primary/[0.08] hover:shadow-[0_4px_12px_rgba(45,122,107,0.06)] hover:translate-y-[-1px] transition-all duration-300 group"
                     >
                       <div className="flex items-center justify-between gap-2 mb-1.5">
                         <div className="flex items-center gap-2">

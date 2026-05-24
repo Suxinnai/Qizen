@@ -29,7 +29,11 @@ export default function Notes() {
                 key={note.id}
                 type="button"
                 onClick={() => setSelectedId(note.id)}
-                className={`w-full text-left rounded-md px-3 py-3 transition-colors ${selectedId === note.id ? "bg-qz-primary/10 text-qz-primary" : "hover:bg-black/5 dark:hover:bg-white/5"}`}
+                className={`w-full text-left rounded-xl px-3.5 py-3 transition-all duration-300 ${
+                  selectedId === note.id
+                    ? "bg-[#E2F1EC] dark:bg-[rgba(45,122,107,0.2)] text-[#1A5C4A] dark:text-[#5BA593] font-semibold shadow-[0_2px_8px_rgba(45,122,107,0.04)]"
+                    : "text-qz-text dark:text-qz-text-dark hover:bg-black/[0.03] dark:hover:bg-white/[0.03] hover:translate-x-0.5"
+                }`}
               >
                 <div className="text-[13px] font-medium">{note.title}</div>
                 <div className="text-[11px] text-qz-text-muted mt-1">{note.topic}</div>
@@ -50,12 +54,12 @@ export default function Notes() {
                   <button
                     type="button"
                     onClick={() => navigate("/study", { state: { source: "note", noteId: selected.id } })}
-                    className="px-3 py-2 rounded-md bg-qz-primary text-white text-[12px] flex items-center gap-2 hover:bg-qz-dark"
+                    className="qz-btn-primary px-3.5 py-2 text-[12px] flex items-center gap-2"
                   >
                     带去学习空间
                   </button>
-                  <button className="px-3 py-2 rounded-md border border-black/10 dark:border-white/10 text-[12px] flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5"><Download size={14} />导出</button>
-                  <button className="px-3 py-2 rounded-md border border-black/10 dark:border-white/10 text-[12px] flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5"><Copy size={14} />复制到 Anki</button>
+                  <button className="qz-btn-secondary px-3.5 py-2 text-[12px] flex items-center gap-2"><Download size={14} />导出</button>
+                  <button className="qz-btn-secondary px-3.5 py-2 text-[12px] flex items-center gap-2"><Copy size={14} />复制到 Anki</button>
                 </div>
               </div>
 

@@ -126,14 +126,14 @@ export default function Settings() {
     <div className="h-full overflow-y-auto">
       <div className="p-8 max-w-[1120px] mx-auto flex flex-col gap-6">
         <div>
-          <h1 className="text-[28px] font-semibold text-qz-text-strong dark:text-qz-text-dark mb-2">设置</h1>
-          <p className="text-[14px] text-qz-text-muted">管理模型、自动化行为和本地数据策略。</p>
+          <h1 className="font-serif text-[34px] text-qz-primary mb-2">设置</h1>
+          <p className="font-serif italic text-[14px] text-qz-text-muted">管理模型、自动化行为和本地数据策略</p>
         </div>
 
         <div className="qz-card space-y-5">
           <div>
-            <div className="text-[11px] tracking-[0.24em] uppercase text-qz-text-muted mb-2">07 设置项设计</div>
-            <h2 className="font-serif text-[28px] text-qz-text-strong dark:text-qz-text-dark">三个配置分组</h2>
+            <div className="text-[11px] tracking-[0.24em] uppercase text-qz-primary mb-2 font-semibold">PREFERENCES · 参数配置</div>
+            <h2 className="font-serif text-[24px] text-qz-text-strong dark:text-qz-text-dark">个性化智能学习环境</h2>
           </div>
 
           <div className="space-y-4">
@@ -201,7 +201,7 @@ export default function Settings() {
                     type="button"
                     onClick={handleTestConnection}
                     disabled={connectionStatus.kind === "testing"}
-                    className="px-4 py-2 rounded-[12px] bg-qz-primary text-white text-[12px] hover:bg-qz-dark transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="qz-btn-primary px-4 py-2 text-[12px] disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     {connectionStatus.kind === "testing" ? "测试中..." : "测试连接"}
                   </button>

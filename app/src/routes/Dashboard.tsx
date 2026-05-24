@@ -228,7 +228,7 @@ function PendingReviewCard({ data }: { data: AppData }) {
               <button
                 type="button"
                 onClick={() => navigate("/study")}
-                className="px-3 py-1.5 rounded-md bg-qz-primary text-white text-[12px] hover:bg-qz-dark transition-colors shrink-0"
+                className="qz-btn-primary px-3.5 py-1.5 text-[12px] shrink-0"
               >
                 去学习
               </button>
@@ -299,7 +299,7 @@ function ReportsEntryCard() {
           <div className="text-[12px] text-qz-text-muted mt-1">查看最近提问、资料命中和 fallback 情况</div>
         </div>
       </div>
-      <button type="button" onClick={() => navigate("/reports")} className="px-4 py-2 rounded-full bg-qz-primary text-white text-[12px] hover:bg-qz-dark transition-colors">
+      <button type="button" onClick={() => navigate("/reports")} className="qz-btn-primary px-4 py-2 text-[12px]">
         查看报告
       </button>
     </div>
