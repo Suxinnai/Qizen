@@ -196,8 +196,8 @@ export default function Goals() {
               </div>
             </div>
 
-            <button className="qz-btn-primary px-5 py-2.5 text-[13px] flex items-center gap-2 group shadow-md transition-all duration-300">
-              <Plus size={15} className="group-hover:rotate-90 transition-transform duration-300" />
+            <button className="qz-btn-primary h-10 px-5 text-[13px] flex items-center justify-center gap-2 group shadow-md transition-all duration-300 leading-none">
+              <Plus size={15} className="group-hover:rotate-90 transition-transform duration-300 shrink-0" />
               <span>新建目标</span>
             </button>
           </div>
@@ -447,12 +447,12 @@ export default function Goals() {
                                       type="button"
                                       onClick={() => navigate("/study", { state: { source: "goal", taskId: task.id } })}
                                       className={clsx(
-                                        "qz-btn-secondary text-[12px] px-4 py-1.5 rounded-full font-bold group flex items-center gap-1.5 shrink-0 transition-all duration-300",
+                                        "qz-btn-secondary h-8 px-3.5 text-[11.5px] rounded-full font-bold group flex items-center justify-center gap-1.5 shrink-0 transition-all duration-300 leading-none",
                                         task.done && "opacity-80 hover:opacity-100"
                                       )}
                                     >
                                       <span>去学习</span>
-                                      <ArrowRight size={13} className="opacity-70 group-hover:translate-x-0.5 transition-transform duration-200" />
+                                      <ArrowRight size={12} className="opacity-75 group-hover:translate-x-0.5 transition-transform duration-200 shrink-0" />
                                     </button>
                                   </div>
                                 </div>

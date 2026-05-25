@@ -215,10 +215,10 @@ export default function Library() {
                 type="button"
                 onClick={handleUpload}
                 disabled={isUploading}
-                className="qz-btn-primary h-10 px-5 text-[13px] flex items-center gap-2 disabled:opacity-60 shadow-sm font-bold"
+                className="qz-btn-primary h-10 px-5 text-[13px] flex items-center justify-center gap-2 disabled:opacity-60 shadow-sm font-bold leading-none"
               >
-                {isUploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-                {isUploading ? "正在解析…" : "上传并解析资料"}
+                {isUploading ? <Loader2 size={14} className="animate-spin shrink-0" /> : <Upload size={14} className="shrink-0" />}
+                <span>{isUploading ? "正在解析…" : "上传并解析资料"}</span>
               </button>
             </div>
             {uploadProgress ? (
@@ -421,27 +421,27 @@ export default function Library() {
                         },
                       })
                     }
-                    className="qz-btn-primary h-9 px-4 text-[12px] flex items-center gap-1.5 shrink-0 whitespace-nowrap shadow-[0_4px_12px_rgba(45,122,107,0.18)] hover:shadow-[0_6px_18px_rgba(45,122,107,0.25)] group font-bold"
+                    className="qz-btn-primary h-9 px-4 text-[12px] flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap shadow-[0_4px_12px_rgba(45,122,107,0.18)] hover:shadow-[0_6px_18px_rgba(45,122,107,0.25)] group font-bold leading-none"
                   >
                     <span>带着去学习空间</span>
-                    <ArrowRight size={13} className="opacity-80 group-hover:translate-x-0.5 transition-transform duration-200" />
+                    <ArrowRight size={13} className="opacity-80 group-hover:translate-x-0.5 transition-transform duration-200 shrink-0" />
                   </button>
                 </div>
 
                 {/* Modern Studio Tab Segment Control */}
                 <div className="px-6 py-3 border-b border-qz-divider dark:border-qz-divider-dark bg-slate-50/20 dark:bg-zinc-900/10 flex items-center">
-                  <div className="bg-black/[0.03] dark:bg-white/[0.04] p-1 rounded-xl flex gap-1 w-full max-w-[420px]">
+                  <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md border border-black/5 dark:border-white/5 p-1 rounded-xl flex gap-1 w-full max-w-[420px] shadow-sm">
                     <button
                       type="button"
                       onClick={() => setActiveTab("analysis")}
                       className={clsx(
-                        "flex-1 py-1.5 rounded-lg text-[12px] font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all duration-200",
+                        "flex-1 py-1.5 rounded-lg text-[12px] font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all duration-200 leading-none",
                         activeTab === "analysis"
                           ? "bg-white dark:bg-qz-card-dark text-qz-primary dark:text-qz-light shadow-sm"
                           : "text-qz-text-muted hover:text-qz-text-strong dark:hover:text-qz-text-dark"
                       )}
                     >
-                      <Sparkles size={13} />
+                      <Sparkles size={13} className="shrink-0" />
                       <span>AI 智能分析</span>
                     </button>
                     
@@ -449,13 +449,13 @@ export default function Library() {
                       type="button"
                       onClick={() => setActiveTab("reading")}
                       className={clsx(
-                        "flex-1 py-1.5 rounded-lg text-[12px] font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all duration-200",
+                        "flex-1 py-1.5 rounded-lg text-[12px] font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all duration-200 leading-none",
                         activeTab === "reading"
                           ? "bg-white dark:bg-qz-card-dark text-qz-primary dark:text-qz-light shadow-sm"
                           : "text-qz-text-muted hover:text-qz-text-strong dark:hover:text-qz-text-dark"
                       )}
                     >
-                      <BookOpen size={13} />
+                      <BookOpen size={13} className="shrink-0" />
                       <span>正文深度阅读</span>
                     </button>
                     
@@ -463,13 +463,13 @@ export default function Library() {
                       type="button"
                       onClick={() => setActiveTab("practice")}
                       className={clsx(
-                        "flex-1 py-1.5 rounded-lg text-[12px] font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all duration-200",
+                        "flex-1 py-1.5 rounded-lg text-[12px] font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all duration-200 leading-none",
                         activeTab === "practice"
                           ? "bg-white dark:bg-qz-card-dark text-qz-primary dark:text-qz-light shadow-sm"
                           : "text-qz-text-muted hover:text-qz-text-strong dark:hover:text-qz-text-dark"
                       )}
                     >
-                      <CheckCircle2 size={13} />
+                      <CheckCircle2 size={13} className="shrink-0" />
                       <span>智能评测练习</span>
                       {practiceItems.length > 0 && (
                         <span className={clsx(
