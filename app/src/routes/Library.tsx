@@ -13,9 +13,7 @@ import {
   Upload,
   ArrowRight,
   ClipboardList,
-  Check,
   Layers,
-  Tag,
   Clock,
   ChevronRight
 } from "lucide-react";
@@ -86,6 +84,17 @@ function PracticeItem({ item }: { item: PracticeSet }) {
       </span>
     </div>
   );
+}
+
+interface UploadProgress {
+  currentFile: string;
+  currentIndex: number;
+  totalFiles: number;
+}
+
+interface UploadResult {
+  type: "success" | "error";
+  message: string;
 }
 
 export default function Library() {
@@ -184,12 +193,12 @@ export default function Library() {
 
   return (
     <div className="relative h-full overflow-hidden bg-qz-bg dark:bg-qz-bg-dark transition-colors duration-200">
-      <div className="h-full p-8 max-w-[1320px] mx-auto flex flex-col gap-6">
+      <div className="h-full p-8 max-w-[1320px] mx-auto flex flex-col gap-4">
         
         {/* Header Block */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-qz-divider dark:border-qz-divider-dark pb-5">
           <div>
-            <h1 className="font-serif text-[34px] text-qz-text-strong dark:text-qz-text-dark mb-1.5">资料库</h1>
+            <h1 className="font-serif text-[34px] text-qz-text-strong dark:text-qz-text-dark mb-1.5 font-bold">资料库</h1>
             <p className="font-serif italic text-[14px] text-qz-text-muted">厚积薄发，栖于卷帙</p>
           </div>
           <div className="flex flex-col items-end gap-2">
@@ -206,7 +215,7 @@ export default function Library() {
                 type="button"
                 onClick={handleUpload}
                 disabled={isUploading}
-                className="qz-btn-primary h-10 px-5 text-[13px] flex items-center gap-2 disabled:opacity-60 shadow-sm"
+                className="qz-btn-primary h-10 px-5 text-[13px] flex items-center gap-2 disabled:opacity-60 shadow-sm font-bold"
               >
                 {isUploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
                 {isUploading ? "正在解析…" : "上传并解析资料"}
@@ -239,25 +248,30 @@ export default function Library() {
           </div>
         </div>
 
-        {/* Top Quick Stats Grid */}
-        <div className="grid grid-cols-3 gap-6">
-          <div className="qz-card !p-5 bg-gradient-to-br from-emerald-50/10 to-transparent dark:from-teal-950/10">
-            <div className="text-[11px] text-qz-text-muted font-medium mb-1">已收纳资料</div>
-            <div className="font-serif text-[30px] font-semibold text-qz-primary dark:text-qz-light leading-none">{data.libraryItems.length}</div>
+        {/* Compact Horizontal Stats Capsule */}
+        <div className="flex flex-wrap items-center justify-between gap-4 bg-white/40 dark:bg-qz-card-dark/30 border border-black/5 dark:border-white/5 rounded-qz px-6 py-3.5 text-[12.5px] shadow-sm shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-qz-primary animate-pulse" />
+            <span className="text-qz-text-muted font-medium">已收纳资料：</span>
+            <span className="font-bold text-qz-text-strong dark:text-qz-text-dark">{data.libraryItems.length} 份</span>
           </div>
-          <div className="qz-card !p-5 bg-gradient-to-br from-blue-50/10 to-transparent dark:from-blue-950/10">
-            <div className="text-[11px] text-qz-text-muted font-medium mb-1">AI 生成练习</div>
-            <div className="font-serif text-[30px] font-semibold text-qz-primary dark:text-qz-light leading-none">{data.practiceSets.length}</div>
+          <div className="hidden sm:block w-px h-4 bg-qz-divider dark:bg-qz-divider-dark" />
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-blue-500" />
+            <span className="text-qz-text-muted font-medium">AI 生成练习：</span>
+            <span className="font-bold text-qz-text-strong dark:text-qz-text-dark">{data.practiceSets.length} 套</span>
           </div>
-          <div className="qz-card !p-5 bg-gradient-to-br from-purple-50/10 to-transparent dark:from-purple-950/10">
-            <div className="text-[11px] text-qz-text-muted font-medium mb-1">支持解析格式</div>
-            <div className="font-serif text-[18px] font-semibold text-qz-primary dark:text-qz-light mt-1.5 leading-none">PDF · Markdown · DOCX</div>
+          <div className="hidden sm:block w-px h-4 bg-qz-divider dark:bg-qz-divider-dark" />
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-purple-500" />
+            <span className="text-qz-text-muted font-medium">支持解析格式：</span>
+            <span className="font-bold text-qz-primary dark:text-qz-light font-serif">PDF · Markdown · DOCX</span>
           </div>
         </div>
 
         {/* Dynamic Studio Workspace Layout */}
         <div className="flex-1 min-h-0 grid grid-cols-[380px,1fr] gap-6">
-          
+
           {/* Left Panel: Document List */}
           <div className="min-h-0 flex flex-col rounded-qz border border-[#EFEDE8] dark:border-white/5 bg-white/60 dark:bg-black/10 overflow-hidden shadow-sm">
             <div className="px-4 py-3.5 border-b border-qz-divider dark:border-qz-divider-dark flex flex-col gap-3">
@@ -316,7 +330,7 @@ export default function Library() {
                         setActiveTab("analysis");
                       }}
                       className={clsx(
-                        "w-full text-left rounded-qz px-4 py-4 border transition-all duration-300 relative group",
+                        "w-full text-left rounded-qz px-4 py-3.5 border transition-all duration-300 relative group",
                         active
                           ? "bg-[#E2F1EC]/30 dark:bg-[rgba(45,122,107,0.12)] border-qz-primary shadow-sm"
                           : "bg-white/70 dark:bg-black/15 border-black/5 dark:border-white/5 hover:border-black/[0.08] dark:hover:border-white/[0.08] hover:bg-white dark:hover:bg-black/25 hover:shadow-sm"
@@ -328,20 +342,20 @@ export default function Library() {
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-3">
-                            <div className="text-[13.5px] font-semibold text-qz-text-strong dark:text-qz-text-dark truncate group-hover:text-qz-primary dark:group-hover:text-qz-light transition-colors">
+                            <div className={clsx(
+                              "text-[13.5px] font-semibold text-qz-text-strong dark:text-qz-text-dark group-hover:text-qz-primary dark:group-hover:text-qz-light transition-colors truncate",
+                              active && "text-qz-primary dark:text-qz-light font-bold"
+                            )}>
                               {item.title}
                             </div>
-                            <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-white/90 dark:bg-black/40 text-qz-text-muted border border-black/5 dark:border-white/5 shrink-0 uppercase tracking-wider font-bold">
+                            <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.06] text-qz-text-muted border border-black/5 dark:border-white/5 shrink-0 uppercase tracking-wider font-bold">
                               {item.type}
                             </span>
                           </div>
-                          <div className="text-[11px] text-qz-text-muted mt-1.5">
+                          <div className="text-[11px] text-qz-text-muted mt-1">
                             {item.course} · {item.sizeLabel}
                           </div>
-                          <div className="text-[11px] text-qz-text-muted mt-2 line-clamp-2 leading-relaxed">
-                            {item.preview}
-                          </div>
-                          <div className="flex items-center gap-1.5 flex-wrap mt-3.5">
+                          <div className="flex items-center gap-1.5 flex-wrap mt-2.5">
                             <span className={clsx(
                               "text-[9.5px] px-2 py-0.5 rounded-full font-bold border",
                               item.parserStatus === "parsed"
@@ -373,20 +387,26 @@ export default function Library() {
               <div className="h-full flex flex-col min-h-0">
                 
                 {/* Workspace Header Block */}
-                <div className="px-6 py-5 border-b border-qz-divider dark:border-qz-divider-dark bg-gradient-to-b from-qz-primary/[0.015] to-transparent flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="px-6 py-5 border-b border-qz-divider dark:border-qz-divider-dark bg-gradient-to-b from-qz-primary/[0.015] to-transparent flex flex-col sm:flex-row sm:items-center justify-between gap-6">
                   <div className="min-w-0">
-                    <h2 className="font-serif text-[24px] text-qz-text-strong dark:text-qz-text-dark font-semibold leading-snug truncate">
+                    <h2 className="font-serif text-[25px] text-qz-text-strong dark:text-qz-text-dark font-bold leading-tight truncate">
                       {selected.title}
                     </h2>
-                    <div className="text-[11.5px] text-qz-text-muted mt-1.5 flex items-center gap-3.5 flex-wrap">
-                      <span className="flex items-center gap-1">
-                        <Tag size={12} className="opacity-70" />
-                        <span>文件名：{selected.originalFileName}</span>
+                    
+                    {/* Modern Clean Metadata Badges */}
+                    <div className="text-[11px] text-qz-text-muted mt-2.5 flex items-center gap-2 flex-wrap font-medium">
+                      <span className="flex items-center gap-1.5 bg-black/[0.03] dark:bg-white/[0.04] px-2.5 py-0.5 rounded border border-black/5 dark:border-white/5 shadow-sm">
+                        <FileText size={11.5} className="text-qz-primary dark:text-qz-light opacity-80" />
+                        <span>{selected.originalFileName}</span>
                       </span>
-                      <span>·</span>
-                      <span>课程：{selected.course}</span>
-                      <span>·</span>
-                      <span>类型：{selected.type} · {selected.sizeLabel}{selected.pageCount ? ` · ${selected.pageCount} 页` : ""}</span>
+                      <span className="flex items-center gap-1.5 bg-black/[0.03] dark:bg-white/[0.04] px-2.5 py-0.5 rounded border border-black/5 dark:border-white/5 shadow-sm">
+                        <Layers size={11.5} className="text-qz-primary dark:text-qz-light opacity-80" />
+                        <span>{selected.course}</span>
+                      </span>
+                      <span className="flex items-center gap-1.5 bg-black/[0.03] dark:bg-white/[0.04] px-2.5 py-0.5 rounded border border-black/5 dark:border-white/5 shadow-sm">
+                        <Clock size={11.5} className="text-qz-primary dark:text-qz-light opacity-80" />
+                        <span>{selected.sizeLabel}{selected.pageCount ? ` · ${selected.pageCount}页` : ""}</span>
+                      </span>
                     </div>
                   </div>
 
@@ -401,27 +421,27 @@ export default function Library() {
                         },
                       })
                     }
-                    className="qz-btn-primary h-9 px-4.5 text-[12px] flex items-center gap-1.5 shrink-0 whitespace-nowrap shadow-sm group font-bold"
+                    className="qz-btn-primary h-9 px-4 text-[12px] flex items-center gap-1.5 shrink-0 whitespace-nowrap shadow-[0_4px_12px_rgba(45,122,107,0.18)] hover:shadow-[0_6px_18px_rgba(45,122,107,0.25)] group font-bold"
                   >
                     <span>带着去学习空间</span>
                     <ArrowRight size={13} className="opacity-80 group-hover:translate-x-0.5 transition-transform duration-200" />
                   </button>
                 </div>
 
-                {/* Modern Studio Tabs Bar */}
-                <div className="px-6 border-b border-qz-divider dark:border-qz-divider-dark bg-slate-50/20 dark:bg-zinc-900/10 flex items-center">
-                  <div className="flex gap-1.5 py-2">
+                {/* Modern Studio Tab Segment Control */}
+                <div className="px-6 py-3 border-b border-qz-divider dark:border-qz-divider-dark bg-slate-50/20 dark:bg-zinc-900/10 flex items-center">
+                  <div className="bg-black/[0.03] dark:bg-white/[0.04] p-1 rounded-xl flex gap-1 w-full max-w-[420px]">
                     <button
                       type="button"
                       onClick={() => setActiveTab("analysis")}
                       className={clsx(
-                        "px-4 py-2 rounded-lg text-[12.5px] font-bold flex items-center gap-2 cursor-pointer transition-all duration-200",
+                        "flex-1 py-1.5 rounded-lg text-[12px] font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all duration-200",
                         activeTab === "analysis"
                           ? "bg-white dark:bg-qz-card-dark text-qz-primary dark:text-qz-light shadow-sm"
-                          : "text-qz-text-muted hover:text-qz-text-strong dark:hover:text-qz-text-dark hover:bg-black/[0.02]"
+                          : "text-qz-text-muted hover:text-qz-text-strong dark:hover:text-qz-text-dark"
                       )}
                     >
-                      <Sparkles size={13.5} />
+                      <Sparkles size={13} />
                       <span>AI 智能分析</span>
                     </button>
                     
@@ -429,13 +449,13 @@ export default function Library() {
                       type="button"
                       onClick={() => setActiveTab("reading")}
                       className={clsx(
-                        "px-4 py-2 rounded-lg text-[12.5px] font-bold flex items-center gap-2 cursor-pointer transition-all duration-200",
+                        "flex-1 py-1.5 rounded-lg text-[12px] font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all duration-200",
                         activeTab === "reading"
                           ? "bg-white dark:bg-qz-card-dark text-qz-primary dark:text-qz-light shadow-sm"
-                          : "text-qz-text-muted hover:text-qz-text-strong dark:hover:text-qz-text-dark hover:bg-black/[0.02]"
+                          : "text-qz-text-muted hover:text-qz-text-strong dark:hover:text-qz-text-dark"
                       )}
                     >
-                      <BookOpen size={13.5} />
+                      <BookOpen size={13} />
                       <span>正文深度阅读</span>
                     </button>
                     
@@ -443,16 +463,21 @@ export default function Library() {
                       type="button"
                       onClick={() => setActiveTab("practice")}
                       className={clsx(
-                        "px-4 py-2 rounded-lg text-[12.5px] font-bold flex items-center gap-2 cursor-pointer transition-all duration-200",
+                        "flex-1 py-1.5 rounded-lg text-[12px] font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all duration-200",
                         activeTab === "practice"
                           ? "bg-white dark:bg-qz-card-dark text-qz-primary dark:text-qz-light shadow-sm"
-                          : "text-qz-text-muted hover:text-qz-text-strong dark:hover:text-qz-text-dark hover:bg-black/[0.02]"
+                          : "text-qz-text-muted hover:text-qz-text-strong dark:hover:text-qz-text-dark"
                       )}
                     >
-                      <CheckCircle2 size={13.5} />
+                      <CheckCircle2 size={13} />
                       <span>智能评测练习</span>
                       {practiceItems.length > 0 && (
-                        <span className="ml-1 w-5 h-5 rounded-full bg-qz-primary/10 text-qz-primary text-[10px] font-extrabold flex items-center justify-center">
+                        <span className={clsx(
+                          "ml-1 w-5 h-5 rounded-full text-[9.5px] font-extrabold flex items-center justify-center transition-colors",
+                          activeTab === "practice" 
+                            ? "bg-qz-primary/10 text-qz-primary" 
+                            : "bg-black/5 dark:bg-white/10 text-qz-text-muted"
+                        )}>
                           {practiceItems.length}
                         </span>
                       )}
@@ -467,53 +492,53 @@ export default function Library() {
                   {activeTab === "analysis" && (
                     <div className="space-y-6">
                       
-                      {/* Summary Block */}
-                      <div className="rounded-qz bg-gradient-to-br from-qz-primary/[0.03] to-transparent dark:from-qz-primary/[0.07] border border-qz-primary/10 p-5 shadow-sm">
-                        <div className="flex items-center gap-2 mb-2 text-qz-primary dark:text-qz-light">
-                          <Sparkles size={14} className="opacity-90" />
-                          <span className="text-[12px] font-bold uppercase tracking-wider">AI 摘要总结</span>
+                      {/* Summary Block with elegant Left Accent Bar */}
+                      <div className="rounded-r-qz border-l-4 border-qz-primary bg-qz-primary/[0.02] dark:bg-qz-primary/[0.05] py-3.5 px-4 shadow-sm">
+                        <div className="flex items-center gap-2 mb-1.5 text-qz-primary dark:text-qz-light font-bold text-[12px] tracking-wider">
+                          <Sparkles size={13} className="opacity-95" />
+                          <span>AI 核心摘要</span>
                         </div>
                         <p className="text-[13px] text-qz-text dark:text-qz-text-dark leading-relaxed font-normal">
                           {selected.summary}
                         </p>
                       </div>
 
-                      {/* Extracted Highlights */}
+                      {/* Extracted Highlights as soft borderless cards */}
                       <div>
-                        <h4 className="font-serif text-[18px] text-qz-text-strong dark:text-qz-text-dark font-bold mb-3.5 flex items-center gap-2">
-                          <Layers size={16} className="text-qz-primary dark:text-qz-light opacity-80" />
+                        <h4 className="font-serif text-[16px] text-qz-text-strong dark:text-qz-text-dark font-bold mb-2.5 flex items-center gap-2">
+                          <Layers size={15} className="text-qz-primary dark:text-qz-light opacity-80" />
                           <span>提取重点与核心条件</span>
                         </h4>
-                        <div className="grid md:grid-cols-2 gap-4">
+                        <div className="grid md:grid-cols-2 gap-3">
                           {selected.highlights.length > 0 ? (
                             selected.highlights.map((item, index) => (
                               <div 
                                 key={item} 
-                                className="rounded-qz border border-[#EFEDE8]/80 dark:border-zinc-800/40 p-4 text-[12.5px] bg-slate-50/20 dark:bg-zinc-900/10 text-qz-text dark:text-qz-text-dark leading-relaxed hover:border-qz-primary/20 transition-colors shadow-sm flex items-start gap-2.5"
+                                className="rounded-qz bg-black/[0.015] hover:bg-qz-primary/[0.015] dark:bg-white/[0.015] dark:hover:bg-qz-primary/[0.04] border border-[#EFEDE8]/80 dark:border-zinc-800/40 py-2.5 px-3.5 text-[12.5px] text-qz-text dark:text-qz-text-dark leading-relaxed transition-all duration-300 shadow-sm flex items-start gap-2.5"
                               >
                                 <span className="w-5 h-5 rounded-full bg-qz-primary/10 text-qz-primary flex items-center justify-center text-[10px] font-extrabold shrink-0 mt-0.5">
                                   {index + 1}
                                 </span>
-                                <span>{item}</span>
+                                <span className="font-medium">{item}</span>
                               </div>
                             ))
                           ) : (
-                            <div className="text-[12.5px] text-qz-text-muted py-2 col-span-2 italic">这份资料暂时还没有提取出明显重点。</div>
+                            <div className="text-[12.5px] text-[#808080] py-2 col-span-2 italic">这份资料暂时还没有提取出明显重点。</div>
                           )}
                         </div>
                       </div>
 
                       {/* Linked Knowledge Nodes */}
-                      <div className="border-t border-qz-divider dark:border-qz-divider-dark pt-5">
-                        <h4 className="font-serif text-[18px] text-qz-text-strong dark:text-qz-text-dark font-bold mb-3">关联到的知识节点</h4>
+                      <div className="border-t border-qz-divider dark:border-qz-divider-dark pt-4">
+                        <h4 className="font-serif text-[16px] text-qz-text-strong dark:text-qz-text-dark font-bold mb-2.5">关联到的知识节点</h4>
                         {linkedNodes.length > 0 ? (
-                          <div className="flex items-center gap-2.5 flex-wrap">
+                          <div className="flex items-center gap-2 flex-wrap">
                             {linkedNodes.map((node) => (
                               <span 
                                 key={node.id} 
-                                className="text-[12px] px-3.5 py-1 rounded-full bg-qz-primary/10 text-qz-primary dark:bg-qz-primary/20 dark:text-qz-light font-medium border border-qz-primary/10 shadow-sm flex items-center gap-1.5"
+                                className="text-[11px] px-3 py-1 rounded-full bg-slate-50 dark:bg-zinc-900/40 text-qz-text dark:text-qz-text-dark font-semibold border border-black/5 dark:border-white/5 shadow-sm flex items-center gap-1.5 hover:border-qz-primary/30 transition-all duration-200"
                               >
-                                <Layers size={12} className="opacity-70" />
+                                <Layers size={11} className="opacity-70 text-qz-primary dark:text-qz-light" />
                                 <span>{node.label}</span>
                               </span>
                             ))}
@@ -525,12 +550,12 @@ export default function Library() {
                     </div>
                   )}
 
-                  {/* TAB 2: 正文深度阅读 */}
+                  {/* TAB 2: 正文深度阅读 (Spacious Serif Reading Sheet) */}
                   {activeTab === "reading" && (
                     <div className="h-full flex flex-col min-h-0 space-y-4">
                       
-                      {/* Reader view box */}
-                      <div className="flex-1 min-h-[360px] max-h-[520px] overflow-y-auto p-6 rounded-qz border border-[#EFEDE8]/80 dark:border-zinc-800/40 bg-slate-50/25 dark:bg-zinc-900/10 font-sans text-[13.5px] leading-relaxed text-qz-text dark:text-qz-text-dark whitespace-pre-wrap select-text selection:bg-qz-primary/15 relative">
+                      {/* Reader view box - pure paper design */}
+                      <div className="flex-1 min-h-[380px] max-h-[500px] overflow-y-auto p-8 rounded-qz border border-[#EFEDE8]/80 dark:border-zinc-800/40 bg-gradient-to-br from-slate-50/20 to-transparent dark:from-zinc-900/10 font-serif leading-relaxed text-[14px] text-qz-text-strong dark:text-qz-text-dark whitespace-pre-wrap select-text selection:bg-qz-primary/15 relative shadow-inner">
                         {selected.extractedText || "这份资料当前还没有可提取的文本正文。"}
                       </div>
                       
@@ -538,7 +563,7 @@ export default function Library() {
                       <div className="flex items-center justify-between text-[11px] text-qz-text-muted bg-slate-50/40 dark:bg-zinc-900/10 border border-[#EFEDE8]/50 dark:border-zinc-800/20 px-4 py-2.5 rounded-lg">
                         <span className="flex items-center gap-1.5 font-medium">
                           <FileText size={12.5} className="text-qz-primary dark:text-qz-light" />
-                          <span>文本提取状态：{parserStatusLabel(selected.parserStatus)}</span>
+                          <span>正文解析状态：{parserStatusLabel(selected.parserStatus)}</span>
                         </span>
                         <span>共 {selected.extractedText?.length || 0} 字</span>
                       </div>
@@ -570,7 +595,7 @@ export default function Library() {
                             <ClipboardList size={28} className="mx-auto text-qz-text-muted opacity-40 mb-3" />
                             <h5 className="text-[14px] font-bold text-qz-text-strong dark:text-qz-text-dark mb-1">针对此资料暂无专项练习</h5>
                             <p className="text-[12px] text-qz-text-muted max-w-sm mx-auto leading-relaxed">
-                              您可以点击右上角的「去学习空间」带着本份资料开启会话，系统将在对话交互中为您量身定制练习题。
+                              您可以点击右上角的「去学习空间」带着本份资料开启会话，系统将在对话交互中为您量量身定制练习题。
                             </p>
                           </div>
                         )}

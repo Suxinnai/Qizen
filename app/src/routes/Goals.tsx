@@ -10,12 +10,10 @@ import {
   FileText,
   Clock,
   Trophy,
-  TrendingUp,
   Plus,
   ArrowRight,
   Check,
   Award,
-  Layers,
   Sparkles,
   CheckCircle2
 } from "lucide-react";
