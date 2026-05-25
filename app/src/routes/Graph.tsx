@@ -91,16 +91,21 @@ function EdgePath({ edge, nodes, activeNodeId }: { edge: KnowledgeEdge; nodes: K
 
   const isActive = edge.source === activeNodeId || edge.target === activeNodeId;
   const controlX = (source.x + target.x) / 2;
-  const controlY = Math.min(source.y, target.y) - 40;
+  const controlY = Math.min(source.y, target.y) - 45;
   const path = `M ${source.x} ${source.y} Q ${controlX} ${controlY} ${target.x} ${target.y}`;
 
   return (
     <path
       d={path}
       fill="none"
-      stroke={isActive ? "#2D7A6B" : "#D7E5DF"}
-      strokeWidth={isActive ? 3 : 2}
-      opacity={isActive ? 1 : 0.7}
+      stroke={isActive ? "#2D7A6B" : "currentColor"}
+      strokeWidth={isActive ? 2.5 : 1.5}
+      opacity={isActive ? 1 : 0.4}
+      markerEnd={isActive ? "url(#arrow-active)" : "url(#arrow)"}
+      className={clsx(
+        "transition-all duration-300 text-slate-200 dark:text-zinc-800",
+        isActive && "animate-dash-flow text-qz-primary"
+      )}
     />
   );
 }
@@ -154,7 +159,89 @@ export default function Graph() {
             </div>
 
             <div className="flex-1 min-h-0 p-6">
-              <svg viewBox="0 0 860 520" className="w-full h-full">
+              <svg viewBox="0 0 860 520" className="w-full h-full relative select-none">
+                <style>{`
+                  @keyframes dash {
+                    to {
+                      stroke-dashoffset: -20;
+                    }
+                  }
+                  .animate-dash-flow {
+                    stroke-dasharray: 6, 4;
+                    animation: dash 1.2s linear infinite;
+                  }
+                  @keyframes pulse-halo {
+                    0%, 100% {
+                      transform: scale(1);
+                      opacity: 0.12;
+                    }
+                    50% {
+                      transform: scale(1.06);
+                      opacity: 0.22;
+                    }
+                  }
+                  .animate-pulse-halo {
+                    animation: pulse-halo 3s ease-in-out infinite;
+                  }
+                  .node-glow {
+                    filter: drop-shadow(0 4px 12px rgba(45, 122, 107, 0.25));
+                  }
+                `}</style>
+                <defs>
+                  {/* Dotted Grid pattern */}
+                  <pattern id="dot-grid" width="28" height="28" patternUnits="userSpaceOnUse">
+                    <circle cx="2" cy="2" r="1" className="fill-black/[0.08] dark:fill-white/[0.04]" />
+                  </pattern>
+
+                  {/* Arrow markers */}
+                  <marker
+                    id="arrow"
+                    viewBox="0 0 10 10"
+                    refX="21"
+                    refY="5"
+                    markerWidth="5"
+                    markerHeight="5"
+                    orient="auto-start-reverse"
+                  >
+                    <path d="M 0 1 L 9 5 L 0 9 z" className="fill-slate-200 dark:fill-zinc-800" />
+                  </marker>
+                  <marker
+                    id="arrow-active"
+                    viewBox="0 0 10 10"
+                    refX="23"
+                    refY="5"
+                    markerWidth="5.5"
+                    markerHeight="5.5"
+                    orient="auto-start-reverse"
+                  >
+                    <path d="M 0 1 L 9 5 L 0 9 z" fill="#2D7A6B" />
+                  </marker>
+
+                  {/* Gradient states definitions */}
+                  <linearGradient id="grad-mastered" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#52C48A" />
+                    <stop offset="100%" stopColor="#3B9E6A" />
+                  </linearGradient>
+                  
+                  <linearGradient id="grad-current" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#3CA894" />
+                    <stop offset="100%" stopColor="#1E5C50" />
+                  </linearGradient>
+
+                  <linearGradient id="grad-next" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#E6E4E0" />
+                    <stop offset="100%" stopColor="#C2BEB6" />
+                  </linearGradient>
+
+                  <linearGradient id="grad-locked" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#F9F8F6" stopOpacity="0.4" />
+                    <stop offset="100%" stopColor="#E2DFD8" stopOpacity="0.4" />
+                  </linearGradient>
+                </defs>
+
+                {/* Canvas grid background rect */}
+                <rect width="860" height="520" fill="url(#dot-grid)" rx="24" />
+
                 {edges.map((edge) => (
                   <EdgePath key={edge.id} edge={edge} nodes={nodes} activeNodeId={activeNodeId} />
                 ))}
@@ -163,33 +250,78 @@ export default function Graph() {
                   const isActive = node.id === activeNodeId;
                   const degree = computeNodeDegree(node.id, edges);
                   const r = nodeRadius(degree, isActive);
-                  const color = stateColor(node.state);
                   const isLocked = node.state === "locked";
+
+                  // Gradient and stroke styling values
+                  const fillGrad = isLocked
+                    ? "url(#grad-locked)"
+                    : node.state === "mastered"
+                    ? "url(#grad-mastered)"
+                    : node.state === "current"
+                    ? "url(#grad-current)"
+                    : "url(#grad-next)";
+
+                  const strokeColor = isLocked
+                    ? "#C2BEB6"
+                    : node.state === "mastered"
+                    ? "#3B9E6A"
+                    : node.state === "current"
+                    ? "#2D7A6B"
+                    : "#BFBAB0";
 
                   return (
                     <g
                       key={node.id}
                       transform={`translate(${node.x}, ${node.y})`}
-                      className="cursor-pointer"
+                      className="cursor-pointer group/node"
                       onClick={() => setActiveNodeId(node.id)}
                     >
-                      {isActive ? <circle r={r + 8} fill="none" stroke="#2D7A6B" strokeOpacity="0.18" strokeWidth={10} /> : null}
+                      {/* Dual-ring breathing active halos */}
+                      {isActive ? (
+                        <>
+                          <circle
+                            r={r + 10}
+                            fill="none"
+                            stroke="#2D7A6B"
+                            strokeOpacity="0.06"
+                            strokeWidth={6}
+                            className="animate-pulse-halo origin-center"
+                            style={{ transformOrigin: "0px 0px" }}
+                          />
+                          <circle
+                            r={r + 5}
+                            fill="none"
+                            stroke="#2D7A6B"
+                            strokeOpacity="0.14"
+                            strokeWidth={2}
+                          />
+                        </>
+                      ) : null}
+
+                      {/* Glowing interactive node sphere */}
                       <circle
                         r={r}
-                        fill={isLocked ? "none" : color}
-                        stroke={isLocked ? color : "none"}
-                        strokeWidth={isLocked ? 2 : 0}
-                        strokeDasharray={isLocked ? "4 3" : "none"}
-                        opacity={isLocked ? 0.5 : 1}
+                        fill={fillGrad}
+                        stroke={strokeColor}
+                        strokeWidth={isLocked ? 1.5 : isActive ? 2.5 : 1}
+                        strokeDasharray={isLocked ? "3 3" : "none"}
+                        className={clsx(
+                          "transition-all duration-300 origin-center group-hover/node:scale-110 group-hover/node:stroke-qz-primary dark:group-hover/node:stroke-qz-light",
+                          isActive ? "node-glow" : ""
+                        )}
+                        style={{ transformOrigin: "0px 0px" }}
                       />
+
+                      {/* Precise theme-aware typography label */}
                       <text
-                        y={r + 16}
+                        y={r + 18}
                         textAnchor="middle"
                         className={clsx(
-                          "select-none",
-                          isActive ? "font-medium" : ""
+                          "select-none transition-all duration-300 font-sans tracking-wide font-medium",
+                          isActive 
+                            ? "font-bold text-[13px] fill-[#1B5246] dark:fill-[#52C48A]"
+                            : "text-[11.5px] fill-slate-700 dark:fill-zinc-400 group-hover/node:fill-qz-primary dark:group-hover/node:fill-qz-light"
                         )}
-                        style={{ fontSize: isActive ? 14 : 12, fill: isActive ? "#2D7A6B" : "#6E6A63" }}
                       >
                         {node.label}
                       </text>
@@ -221,7 +353,7 @@ export default function Graph() {
                     </span>
                   </div>
                   <p className="text-[13px] text-qz-text-muted leading-7 mb-4">{activeNode.summary}</p>
-                  <div className="rounded-[18px] bg-qz-primary/6 px-4 py-4 text-[12px] text-qz-text-muted leading-7 mb-5">
+                  <div className="rounded-[18px] bg-qz-primary/[0.06] px-4 py-4 text-[12px] text-qz-text-muted leading-7 mb-5">
                     <span className="text-qz-primary font-medium">学习提示：</span>{activeNode.studyHint}
                   </div>
 
