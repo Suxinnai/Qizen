@@ -7,7 +7,8 @@ import {
   BookOpen, 
   Edit2, 
   CheckCircle2, 
-  AlertCircle 
+  AlertCircle,
+  MoreHorizontal
 } from "lucide-react";
 import clsx from "clsx";
 import { loadAppData, updateNote } from "../lib/storage";
@@ -94,9 +95,24 @@ export default function Notes() {
     updateNote(selected.id, content);
   }
 
+  // Format the updated timestamp beautifully into slashes: MM/DD HH:mm
+  const updatedDate = useMemo(() => {
+    if (!selected?.updatedAt) return "刚刚";
+    try {
+      const date = new Date(selected.updatedAt);
+      const m = String(date.getMonth() + 1).padStart(2, "0");
+      const d = String(date.getDate()).padStart(2, "0");
+      const h = String(date.getHours()).padStart(2, "0");
+      const min = String(date.getMinutes()).padStart(2, "0");
+      return `${m}/${d} ${h}:${min}`;
+    } catch {
+      return "刚刚";
+    }
+  }, [selected?.updatedAt]);
+
   return (
     <div className="h-full overflow-hidden bg-qz-bg dark:bg-qz-bg-dark transition-colors duration-200">
-      <div className="h-full grid grid-cols-[240px,1fr,320px] min-h-0">
+      <div className="h-full grid grid-cols-[210px,1fr,290px] min-h-0">
         
         {/* Left Aside: Notes Directory */}
         <aside className="border-r border-qz-divider dark:border-qz-divider-dark overflow-y-auto p-5 bg-white/30 dark:bg-black/5">
@@ -139,43 +155,71 @@ export default function Notes() {
         {/* Main Content Area */}
         <main className="overflow-y-auto p-8 bg-white dark:bg-qz-card-dark/20 flex flex-col min-h-0">
           {selected ? (
-            <div className="max-w-3xl w-full mx-auto flex-1 flex flex-col min-h-0">
+            <div className="w-full flex-1 flex flex-col min-h-0">
               
-              {/* Header section with buttons */}
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 border-b border-qz-divider dark:border-qz-divider-dark pb-6 mb-6 shrink-0">
-                <div className="min-w-0">
-                  <h1 className="font-serif text-[32px] text-qz-text-strong dark:text-qz-text-dark font-bold tracking-tight truncate">
-                    {selected.title}
-                  </h1>
-                  <p className="font-serif italic text-[13.5px] text-qz-text-muted mt-1.5">手抄一遍，胜读十遍</p>
+              {/* Header Title Section (Single Row, No Truncation) */}
+              <div className="mb-4.5 shrink-0">
+                <h1 className="font-serif text-[34px] text-qz-text-strong dark:text-qz-text-dark font-bold tracking-tight leading-tight">
+                  {selected.title}
+                </h1>
+                <p className="font-serif italic text-[14px] text-qz-text-muted mt-1.5">手抄一遍，胜读十遍</p>
+              </div>
+
+              {/* Sub-bar: Metadata on Left, Actions on Right */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-qz-divider dark:border-qz-divider-dark pb-4.5 mb-5 shrink-0">
+                <div className="text-[12px] text-qz-text-muted font-medium flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded bg-qz-primary/10 text-qz-primary text-[10.5px] font-bold">
+                    {selected.topic}
+                  </span>
+                  <span>·</span>
+                  <span>最近更新：{updatedDate}</span>
                 </div>
-                
-                {/* Unified Premium Pills Button Group */}
-                <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+
+                <div className="flex items-center gap-2.5 shrink-0">
                   <button
                     type="button"
                     onClick={() => navigate("/study", { state: { source: "note", noteId: selected.id } })}
-                    className="qz-btn-primary h-9.5 px-4 text-[12px] flex items-center gap-1.5 shrink-0 whitespace-nowrap shadow-sm font-bold"
+                    className="qz-btn-primary h-9 px-3.5 text-[11.5px] flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap shadow-sm font-bold leading-none"
                   >
-                    <Sparkles size={13} className="opacity-90" />
+                    <Sparkles size={12} className="opacity-95 shrink-0" />
                     <span>带去学习空间</span>
                   </button>
-                  <button className="qz-btn-secondary h-9.5 px-4 text-[12px] flex items-center gap-1.5 shrink-0 whitespace-nowrap shadow-sm font-semibold">
-                    <Download size={13.5} />
+                  <button className="qz-btn-secondary h-9 px-3.5 text-[11.5px] flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap shadow-sm font-semibold leading-none">
+                    <Download size={13} className="shrink-0" />
                     <span>导出</span>
                   </button>
-                  <button className="qz-btn-secondary h-9.5 px-4 text-[12px] flex items-center gap-1.5 shrink-0 whitespace-nowrap shadow-sm font-semibold">
-                    <Copy size={13.5} />
-                    <span>复制到 Anki</span>
-                  </button>
+                  
+                  {/* More Actions Dropdown Menu */}
+                  <div className="relative group/more">
+                    <button 
+                      type="button"
+                      className="qz-btn-secondary h-9 w-9 p-0 rounded-full flex items-center justify-center shrink-0 shadow-sm hover:border-qz-primary/30 transition-all"
+                    >
+                      <MoreHorizontal size={15} className="text-qz-text-muted group-hover/more:text-qz-primary transition-colors" />
+                    </button>
+                    {/* Floating Dropdown */}
+                    <div className="absolute right-0 top-full mt-2 w-44 rounded-qz border border-black/5 dark:border-white/5 bg-white dark:bg-qz-card-dark p-1.5 shadow-lg opacity-0 pointer-events-none group-hover/more:opacity-100 group-hover/more:pointer-events-auto transition-all duration-200 z-30">
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(selected.content);
+                          alert("已将笔记内容复制到剪贴板，您可以直接粘贴至 Anki！");
+                        }}
+                        className="w-full text-left rounded-md px-3 py-2 text-[12px] text-qz-text dark:text-qz-text-dark hover:bg-black/[0.04] dark:hover:bg-white/[0.04] flex items-center gap-2 transition-colors font-medium"
+                      >
+                        <Copy size={12} className="text-qz-primary shrink-0" />
+                        <span>复制到 Anki</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               {/* Note view container with Segmented Switch */}
               <div className="flex-1 flex flex-col min-h-0 qz-card !p-6 relative shadow-sm border border-black/5 dark:border-white/5 bg-white dark:bg-qz-card-dark overflow-hidden">
                 
-                {/* Preview/Edit Toggle Tab */}
-                <div className="absolute right-6 top-5 bg-black/[0.03] dark:bg-white/[0.04] p-0.5 rounded-lg flex gap-0.5 z-10">
+                {/* Preview/Edit Toggle Tab with Premium Glassmorphism */}
+                <div className="absolute right-6 top-5 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md border border-black/5 dark:border-white/5 p-0.5 rounded-lg flex gap-0.5 z-10 shadow-sm">
                   <button
                     type="button"
                     onClick={() => setIsEditing(false)}
@@ -186,7 +230,7 @@ export default function Notes() {
                         : "text-qz-text-muted hover:text-qz-text-strong dark:hover:text-qz-text-dark"
                     )}
                   >
-                    <BookOpen size={11.5} />
+                    <BookOpen size={11.5} className="shrink-0" />
                     <span>预览</span>
                   </button>
                   <button
@@ -199,7 +243,7 @@ export default function Notes() {
                         : "text-qz-text-muted hover:text-qz-text-strong dark:hover:text-qz-text-dark"
                     )}
                   >
-                    <Edit2 size={11} />
+                    <Edit2 size={11} className="shrink-0" />
                     <span>编辑</span>
                   </button>
                 </div>
