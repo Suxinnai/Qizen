@@ -119,6 +119,46 @@ export default function Graph() {
     nodes.find((node) => node.state === "current")?.id ?? nodes[0]?.id ?? ""
   );
 
+  // Panning and zooming interaction states
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+
+  function handleWheel(e: React.WheelEvent<SVGSVGElement>) {
+    e.preventDefault();
+    const zoomFactor = 1.15;
+    let nextZoom = zoom;
+    if (e.deltaY < 0) {
+      nextZoom = Math.min(3, zoom * zoomFactor);
+    } else {
+      nextZoom = Math.max(0.4, zoom / zoomFactor);
+    }
+    setZoom(nextZoom);
+  }
+
+  function handleMouseDown(e: React.MouseEvent<SVGSVGElement>) {
+    if (e.button !== 0) return;
+    setIsDragging(true);
+    setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+  }
+
+  function handleMouseMove(e: React.MouseEvent<SVGSVGElement>) {
+    if (!isDragging) return;
+    setPan({
+      x: e.clientX - dragStart.x,
+      y: e.clientY - dragStart.y
+    });
+  }
+
+  function handleMouseUp() {
+    setIsDragging(false);
+  }
+
+  function handleMouseLeave() {
+    setIsDragging(false);
+  }
+
   const activeNode = findNode(nodes, activeNodeId) ?? nodes[0];
   const relatedNodeIds = Array.isArray(activeNode?.related) ? activeNode.related : [];
   const relatedNodes = nodes.filter((node) => relatedNodeIds.includes(node.id));
@@ -158,8 +198,19 @@ export default function Graph() {
               <div className="text-[12px] text-qz-text-muted">节点越大代表关联越多；颜色反映学习进度</div>
             </div>
 
-            <div className="flex-1 min-h-0 p-6">
-              <svg viewBox="0 0 860 520" className="w-full h-full relative select-none">
+            <div className="flex-1 min-h-0 p-6 relative">
+              <svg 
+                viewBox="0 0 860 520" 
+                className={clsx(
+                  "w-full h-full relative select-none border border-black/[0.03] dark:border-white/[0.03] rounded-[24px] bg-slate-50/10 dark:bg-zinc-950/10 transition-colors", 
+                  isDragging ? "cursor-grabbing" : "cursor-grab"
+                )}
+                onWheel={handleWheel}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseLeave}
+              >
                 <style>{`
                   @keyframes dash {
                     to {
@@ -242,97 +293,119 @@ export default function Graph() {
                 {/* Canvas grid background rect */}
                 <rect width="860" height="520" fill="url(#dot-grid)" rx="24" />
 
-                {edges.map((edge) => (
-                  <EdgePath key={edge.id} edge={edge} nodes={nodes} activeNodeId={activeNodeId} />
-                ))}
+                {/* Panning & Zooming Wrappers Group */}
+                <g 
+                  transform={`translate(${pan.x}, ${pan.y}) translate(430, 260) scale(${zoom}) translate(-430, -260)`} 
+                  style={{ transition: isDragging ? "none" : "transform 0.15s ease-out" }}
+                >
+                  {edges.map((edge) => (
+                    <EdgePath key={edge.id} edge={edge} nodes={nodes} activeNodeId={activeNodeId} />
+                  ))}
 
-                {nodes.map((node) => {
-                  const isActive = node.id === activeNodeId;
-                  const degree = computeNodeDegree(node.id, edges);
-                  const r = nodeRadius(degree, isActive);
-                  const isLocked = node.state === "locked";
+                  {nodes.map((node) => {
+                    const isActive = node.id === activeNodeId;
+                    const degree = computeNodeDegree(node.id, edges);
+                    const r = nodeRadius(degree, isActive);
+                    const isLocked = node.state === "locked";
 
-                  // Gradient and stroke styling values
-                  const fillGrad = isLocked
-                    ? "url(#grad-locked)"
-                    : node.state === "mastered"
-                    ? "url(#grad-mastered)"
-                    : node.state === "current"
-                    ? "url(#grad-current)"
-                    : "url(#grad-next)";
+                    // Gradient and stroke styling values
+                    const fillGrad = isLocked
+                      ? "url(#grad-locked)"
+                      : node.state === "mastered"
+                      ? "url(#grad-mastered)"
+                      : node.state === "current"
+                      ? "url(#grad-current)"
+                      : "url(#grad-next)";
 
-                  const strokeColor = isLocked
-                    ? "#C2BEB6"
-                    : node.state === "mastered"
-                    ? "#3B9E6A"
-                    : node.state === "current"
-                    ? "#2D7A6B"
-                    : "#BFBAB0";
+                    const strokeColor = isLocked
+                      ? "#C2BEB6"
+                      : node.state === "mastered"
+                      ? "#3B9E6A"
+                      : node.state === "current"
+                      ? "#2D7A6B"
+                      : "#BFBAB0";
 
-                  return (
-                    <g
-                      key={node.id}
-                      transform={`translate(${node.x}, ${node.y})`}
-                      className="cursor-pointer group/node"
-                      onClick={() => setActiveNodeId(node.id)}
-                    >
-                      {/* Dual-ring breathing active halos */}
-                      {isActive ? (
-                        <>
-                          <circle
-                            r={r + 10}
-                            fill="none"
-                            stroke="#2D7A6B"
-                            strokeOpacity="0.06"
-                            strokeWidth={6}
-                            className="animate-pulse-halo origin-center"
-                            style={{ transformOrigin: "0px 0px" }}
-                          />
-                          <circle
-                            r={r + 5}
-                            fill="none"
-                            stroke="#2D7A6B"
-                            strokeOpacity="0.14"
-                            strokeWidth={2}
-                          />
-                        </>
-                      ) : null}
-
-                      {/* Glowing interactive node sphere */}
-                      <circle
-                        r={r}
-                        fill={fillGrad}
-                        stroke={strokeColor}
-                        strokeWidth={isLocked ? 1.5 : isActive ? 2.5 : 1}
-                        strokeDasharray={isLocked ? "3 3" : "none"}
-                        className={clsx(
-                          "transition-all duration-300 origin-center group-hover/node:scale-110 group-hover/node:stroke-qz-primary dark:group-hover/node:stroke-qz-light",
-                          isActive ? "node-glow" : ""
-                        )}
-                        style={{ transformOrigin: "0px 0px" }}
-                      />
-
-                      {/* Precise theme-aware typography label */}
-                      <text
-                        y={r + 18}
-                        textAnchor="middle"
-                        className={clsx(
-                          "select-none transition-all duration-300 font-sans tracking-wide font-medium",
-                          isActive 
-                            ? "font-bold text-[13px] fill-[#1B5246] dark:fill-[#52C48A]"
-                            : "text-[11.5px] fill-slate-700 dark:fill-zinc-400 group-hover/node:fill-qz-primary dark:group-hover/node:fill-qz-light"
-                        )}
+                    return (
+                      <g
+                        key={node.id}
+                        transform={`translate(${node.x}, ${node.y})`}
+                        className="cursor-pointer group/node"
+                        onClick={() => setActiveNodeId(node.id)}
                       >
-                        {node.label}
-                      </text>
-                    </g>
-                  );
-                })}
+                        {/* Dual-ring breathing active halos */}
+                        {isActive ? (
+                          <>
+                            <circle
+                              r={r + 10}
+                              fill="none"
+                              stroke="#2D7A6B"
+                              strokeOpacity="0.06"
+                              strokeWidth={6}
+                              className="animate-pulse-halo origin-center"
+                              style={{ transformOrigin: "0px 0px" }}
+                            />
+                            <circle
+                              r={r + 5}
+                              fill="none"
+                              stroke="#2D7A6B"
+                              strokeOpacity="0.14"
+                              strokeWidth={2}
+                            />
+                          </>
+                        ) : null}
+
+                        {/* Glowing interactive node sphere */}
+                        <circle
+                          r={r}
+                          fill={fillGrad}
+                          stroke={strokeColor}
+                          strokeWidth={isLocked ? 1.5 : isActive ? 2.5 : 1}
+                          strokeDasharray={isLocked ? "3 3" : "none"}
+                          className={clsx(
+                            "transition-all duration-300 origin-center group-hover/node:scale-110 group-hover/node:stroke-qz-primary dark:group-hover/node:stroke-qz-light",
+                            isActive ? "node-glow" : ""
+                          )}
+                          style={{ transformOrigin: "0px 0px" }}
+                        />
+
+                        {/* Precise theme-aware typography label */}
+                        <text
+                          y={r + 18}
+                          textAnchor="middle"
+                          className={clsx(
+                            "select-none transition-all duration-300 font-sans tracking-wide font-medium",
+                            isActive 
+                              ? "font-bold text-[13px] fill-[#1B5246] dark:fill-[#52C48A]"
+                              : "text-[11.5px] fill-slate-700 dark:fill-zinc-400 group-hover/node:fill-qz-primary dark:group-hover/node:fill-qz-light"
+                          )}
+                        >
+                          {node.label}
+                        </text>
+                      </g>
+                    );
+                  })}
+                </g>
               </svg>
+
+              {/* Floating control buttons */}
+              <div className="absolute right-9 bottom-9 flex flex-col gap-2 z-10">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setZoom(1);
+                    setPan({ x: 0, y: 0 });
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-white/85 dark:bg-zinc-900/85 hover:bg-white dark:hover:bg-zinc-800 border border-black/5 dark:border-white/5 text-[11px] text-qz-text-muted hover:text-qz-text-strong dark:hover:text-qz-text-dark font-medium shadow-sm transition-all flex items-center gap-1 cursor-pointer"
+                  title="重置缩放与位置"
+                >
+                  <Compass size={12} className="text-qz-primary dark:text-qz-light" />
+                  <span>重置视角</span>
+                </button>
+              </div>
             </div>
           </div>
 
-          <div className="min-h-0 flex flex-col gap-4 overflow-y-auto pr-1">
+          <div className="min-h-0 flex flex-col gap-4 overflow-y-auto pt-3 pb-6 px-1 pr-1.5">
             {/* Active node detail panel */}
             <div className="qz-card !p-5">
               <div className="flex items-center gap-2 mb-3 text-qz-primary">
