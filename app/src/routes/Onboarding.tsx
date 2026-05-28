@@ -274,7 +274,7 @@ export default function Onboarding() {
         </div>
 
         {/* Carousel Content Area */}
-        <div className="flex-1 flex flex-col relative justify-center">
+        <div className="flex-1 flex flex-col min-h-0 relative overflow-hidden">
           <AnimatePresence mode="wait">
             
             {/* Welcome Screen */}
@@ -285,49 +285,51 @@ export default function Onboarding() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -15 }}
                 transition={{ duration: 0.35, ease: "easeInOut" }}
-                className="p-6 md:p-10 lg:p-12 flex-1 flex flex-col md:flex-row gap-8 lg:gap-12 items-center justify-center overflow-y-auto scrollbar-thin"
+                className="p-6 md:p-10 lg:p-12 flex-1 flex flex-col overflow-y-auto scrollbar-thin"
               >
-                <div className="flex-1">
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-qz-primary/10 text-qz-primary text-[11px] font-extrabold tracking-wider uppercase mb-5 select-none">
-                    <Compass size={11} />
-                    <span>认知偏好引擎</span>
-                  </div>
-                  <h1 className="font-serif text-[38px] md:text-[44px] leading-tight text-qz-text-strong dark:text-qz-text-dark font-bold tracking-tight mb-5">
-                    先认识你，<br /><span className="text-qz-primary bg-gradient-to-r from-qz-primary to-qz-light bg-clip-text text-transparent">再教你。</span>
-                  </h1>
-                  <p className="text-[14.5px] text-qz-text-muted leading-7 mb-8 font-sans">
-                    栖知不会拿同一套死板的模式对待所有人。先用 8 个源自 VARK 认知行为学的小问题认识您的学习偏好，我会帮您把讲解节奏、图谱比重、摘要形态和练习配额，慢慢调节至最符合您天性的样子。
-                  </p>
-                  
-                  <div className="grid grid-cols-2 gap-4 text-[12.5px] text-qz-text-strong dark:text-qz-text-dark font-semibold mb-8 select-none">
-                    <div className="qz-card !p-4 border border-black/5 bg-black/[0.01] dark:bg-white/[0.01] hover:shadow-sm hover:border-[#2D7A6B]/20 transition-all duration-300">
-                      🎨 视觉/听觉/阅读/动手 四维剖析
+                <div className="my-auto w-full flex flex-col md:flex-row gap-8 lg:gap-12 items-center justify-center shrink-0">
+                  <div className="flex-1">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-qz-primary/10 text-qz-primary text-[11px] font-extrabold tracking-wider uppercase mb-5 select-none">
+                      <Compass size={11} />
+                      <span>认知偏好引擎</span>
                     </div>
-                    <div className="qz-card !p-4 border border-black/5 bg-black/[0.01] dark:bg-white/[0.01] hover:shadow-sm hover:border-[#2D7A6B]/20 transition-all duration-300">
-                      💾 结果本地加密保存，依后续行为微调
+                    <h1 className="font-serif text-[38px] md:text-[44px] leading-tight text-qz-text-strong dark:text-qz-text-dark font-bold tracking-tight mb-5">
+                      先认识你，<br /><span className="text-qz-primary bg-gradient-to-r from-qz-primary to-qz-light bg-clip-text text-transparent">再教你。</span>
+                    </h1>
+                    <p className="text-[14.5px] text-qz-text-muted leading-7 mb-8 font-sans">
+                      栖知不会拿同一套死板的模式对待所有人。先用 8 个源自 VARK 认知行为学的小问题认识您的学习偏好，我会帮您把讲解节奏、图谱比重、摘要形态和练习配额，慢慢调节至最符合您天性的样子。
+                    </p>
+                    
+                    <div className="grid grid-cols-2 gap-4 text-[12.5px] text-qz-text-strong dark:text-qz-text-dark font-semibold mb-8 select-none">
+                      <div className="qz-card !p-4 border border-black/5 bg-black/[0.01] dark:bg-white/[0.01] hover:shadow-sm hover:border-[#2D7A6B]/20 transition-all duration-300">
+                        🎨 视觉/听觉/阅读/动手 四维剖析
+                      </div>
+                      <div className="qz-card !p-4 border border-black/5 bg-black/[0.01] dark:bg-white/[0.01] hover:shadow-sm hover:border-[#2D7A6B]/20 transition-all duration-300">
+                        💾 结果本地加密保存，依后续行为微调
+                      </div>
                     </div>
+                    
+                    <motion.button
+                      whileHover={{ scale: 1.025, y: -1 }}
+                      whileTap={{ scale: 0.985 }}
+                      type="button"
+                      onClick={start}
+                      className="px-6 py-3.5 rounded-2xl bg-qz-primary text-white text-[14px] font-bold hover:bg-[#205a4e] cursor-pointer shadow-[0_4px_16px_rgba(45,122,107,0.22)] transition-all duration-300 flex items-center gap-1.5"
+                    >
+                      <span>开启认知基因测试</span>
+                      <Compass size={13.5} />
+                    </motion.button>
                   </div>
                   
-                  <motion.button
-                    whileHover={{ scale: 1.025, y: -1 }}
-                    whileTap={{ scale: 0.985 }}
-                    type="button"
-                    onClick={start}
-                    className="px-6 py-3.5 rounded-2xl bg-qz-primary text-white text-[14px] font-bold hover:bg-[#205a4e] cursor-pointer shadow-[0_4px_16px_rgba(45,122,107,0.22)] transition-all duration-300 flex items-center gap-1.5"
-                  >
-                    <span>开启认知基因测试</span>
-                    <Compass size={13.5} />
-                  </motion.button>
-                </div>
-                
-                {/* Visual Decorative leaf background */}
-                <div className="relative w-[280px] h-[280px] shrink-0 flex items-center justify-center select-none hidden md:flex">
-                  <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-qz-light/5 to-qz-primary/[0.03] blur-3xl animate-pulse" />
-                  <Leaf size={170} rotate={18} className="absolute opacity-15 dark:opacity-10" stroke="#2D7A6B" />
-                  <Leaf size={120} rotate={-25} className="absolute left-10 top-6 opacity-10 dark:opacity-8" stroke="#5BA593" />
-                  <div className="w-36 h-36 rounded-full border border-qz-primary/10 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md flex flex-col items-center justify-center font-serif shadow-[0_8px_32px_rgba(0,0,0,0.02)]">
-                    <span className="text-[28px] font-bold text-qz-primary tracking-tight font-serif">8</span>
-                    <span className="text-[11px] text-qz-text-muted font-bold font-sans tracking-widest uppercase mt-0.5">Questions</span>
+                  {/* Visual Decorative leaf background */}
+                  <div className="relative w-[280px] h-[280px] shrink-0 flex items-center justify-center select-none hidden md:flex">
+                    <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-qz-light/5 to-qz-primary/[0.03] blur-3xl animate-pulse" />
+                    <Leaf size={170} rotate={18} className="absolute opacity-15 dark:opacity-10" stroke="#2D7A6B" />
+                    <Leaf size={120} rotate={-25} className="absolute left-10 top-6 opacity-10 dark:opacity-8" stroke="#5BA593" />
+                    <div className="w-36 h-36 rounded-full border border-qz-primary/10 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md flex flex-col items-center justify-center font-serif shadow-[0_8px_32px_rgba(0,0,0,0.02)]">
+                      <span className="text-[28px] font-bold text-qz-primary tracking-tight font-serif">8</span>
+                      <span className="text-[11px] text-qz-text-muted font-bold font-sans tracking-widest uppercase mt-0.5">Questions</span>
+                    </div>
                   </div>
                 </div>
               </motion.div>
@@ -341,54 +343,56 @@ export default function Onboarding() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -25 }}
                 transition={{ duration: 0.3, ease: "easeInOut" }}
-                className="p-6 md:p-10 lg:p-12 w-full flex-1 flex flex-col justify-center overflow-y-auto scrollbar-thin"
+                className="p-6 md:p-10 lg:p-12 w-full flex-1 flex flex-col overflow-y-auto scrollbar-thin"
               >
-                <div className="flex items-center justify-between mb-5 select-none">
-                  <div className="px-3 py-1 rounded-lg bg-black/[0.03] dark:bg-white/[0.04] border border-black/5 dark:border-white/5 text-[11px] font-bold text-qz-text-muted font-sans tracking-wide">
-                    {QUESTIONS[step].category}
+                <div className="my-auto w-full flex flex-col shrink-0">
+                  <div className="flex items-center justify-between mb-5 select-none">
+                    <div className="px-3 py-1 rounded-lg bg-black/[0.03] dark:bg-white/[0.04] border border-black/5 dark:border-white/5 text-[11px] font-bold text-qz-text-muted font-sans tracking-wide">
+                      {QUESTIONS[step].category}
+                    </div>
+                    <div className="text-[12.5px] font-bold font-mono text-qz-primary tracking-widest">
+                      {(step + 1).toString().padStart(2, "0")} / {QUESTIONS.length.toString().padStart(2, "0")}
+                    </div>
                   </div>
-                  <div className="text-[12.5px] font-bold font-mono text-qz-primary tracking-widest">
-                    {(step + 1).toString().padStart(2, "0")} / {QUESTIONS.length.toString().padStart(2, "0")}
+                  
+                  <h2 className="font-serif text-[26px] md:text-[30px] leading-snug text-qz-text-strong dark:text-qz-text-dark font-bold tracking-tight mb-8">
+                    {QUESTIONS[step].prompt}
+                  </h2>
+                  
+                  <div className="grid gap-4">
+                    {QUESTIONS[step].options.map((option, idx) => {
+                      const letter = ["A", "B", "C", "D"][idx];
+                      return (
+                        <motion.button
+                          key={idx}
+                          whileHover={{ 
+                            scale: 1.012,
+                            borderColor: "rgba(45, 122, 107, 0.25)",
+                            backgroundColor: "rgba(45, 122, 107, 0.015)",
+                            boxShadow: "0 4px 16px rgba(45, 122, 107, 0.04)"
+                          }}
+                          whileTap={{ scale: 0.995 }}
+                          type="button"
+                          onClick={() => answer(option.value)}
+                          className="text-left p-5 rounded-[20px] border border-black/[0.05] dark:border-white/[0.08] bg-white dark:bg-white/[0.01] transition-all duration-300 cursor-pointer shadow-sm relative group flex items-center gap-4"
+                        >
+                          {/* Elegant Circular Letter Badge */}
+                          <div className="w-9 h-9 rounded-full border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.02] text-qz-text-muted group-hover:border-qz-primary/30 group-hover:bg-[#E2F1EC] group-hover:text-qz-primary dark:group-hover:bg-[#2D7A6B]/20 dark:group-hover:text-[#5BA593] flex items-center justify-center shrink-0 text-[13px] font-bold font-sans transition-all duration-300">
+                            {letter}
+                          </div>
+                          
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[14.5px] font-semibold text-qz-text-strong dark:text-qz-text-dark leading-snug group-hover:text-qz-primary dark:group-hover:text-white transition-colors duration-200">
+                              {option.label}
+                            </div>
+                            <div className="text-[11.5px] text-qz-text-muted mt-1 font-medium font-sans">
+                              {option.explanation}
+                            </div>
+                          </div>
+                        </motion.button>
+                      );
+                    })}
                   </div>
-                </div>
-                
-                <h2 className="font-serif text-[26px] md:text-[30px] leading-snug text-qz-text-strong dark:text-qz-text-dark font-bold tracking-tight mb-8">
-                  {QUESTIONS[step].prompt}
-                </h2>
-                
-                <div className="grid gap-4">
-                  {QUESTIONS[step].options.map((option, idx) => {
-                    const letter = ["A", "B", "C", "D"][idx];
-                    return (
-                      <motion.button
-                        key={idx}
-                        whileHover={{ 
-                          scale: 1.012,
-                          borderColor: "rgba(45, 122, 107, 0.25)",
-                          backgroundColor: "rgba(45, 122, 107, 0.015)",
-                          boxShadow: "0 4px 16px rgba(45, 122, 107, 0.04)"
-                        }}
-                        whileTap={{ scale: 0.995 }}
-                        type="button"
-                        onClick={() => answer(option.value)}
-                        className="text-left p-5 rounded-[20px] border border-black/[0.05] dark:border-white/[0.08] bg-white dark:bg-white/[0.01] transition-all duration-300 cursor-pointer shadow-sm relative group flex items-center gap-4"
-                      >
-                        {/* Elegant Circular Letter Badge */}
-                        <div className="w-9 h-9 rounded-full border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.02] text-qz-text-muted group-hover:border-qz-primary/30 group-hover:bg-[#E2F1EC] group-hover:text-qz-primary dark:group-hover:bg-[#2D7A6B]/20 dark:group-hover:text-[#5BA593] flex items-center justify-center shrink-0 text-[13px] font-bold font-sans transition-all duration-300">
-                          {letter}
-                        </div>
-                        
-                        <div className="flex-1 min-w-0">
-                          <div className="text-[14.5px] font-semibold text-qz-text-strong dark:text-qz-text-dark leading-snug group-hover:text-qz-primary dark:group-hover:text-white transition-colors duration-200">
-                            {option.label}
-                          </div>
-                          <div className="text-[11.5px] text-qz-text-muted mt-1 font-medium font-sans">
-                            {option.explanation}
-                          </div>
-                        </div>
-                      </motion.button>
-                    );
-                  })}
                 </div>
               </motion.div>
             )}
