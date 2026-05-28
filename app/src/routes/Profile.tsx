@@ -1,8 +1,8 @@
 import { useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { BarChart3, BookOpen, CheckCircle2, Clock, Database, MessageSquareText, Settings, Sparkles, UserRound } from "lucide-react";
 
-import { getStudyInteractionCount, loadAppData, modeLabel, type LearningScores } from "../lib/storage";
+import { getStudyInteractionCount, loadAppData, modeLabel, resetOnboarding, type LearningScores } from "../lib/storage";
 
 /** 纯 CSS 雷达图：4 个轴 visual / auditory / reading / kinesthetic */
 function LearningRadar({ scores }: { scores: LearningScores }) {
@@ -122,6 +122,7 @@ function LearningRadar({ scores }: { scores: LearningScores }) {
 }
 
 export default function Profile() {
+  const navigate = useNavigate();
   const data = useMemo(() => loadAppData(), []);
   const profile = data.learningProfile;
   const interactionCount = getStudyInteractionCount(data);
@@ -140,6 +141,13 @@ export default function Profile() {
     "practice-completed": "完成练习",
     "progress-updated": "进度更新",
   };
+
+  function handleReOnboard() {
+    if (confirm("确定要重新进行学习画像评测吗？这将重置当前的四维分布分值并开始重新测试。")) {
+      resetOnboarding();
+      navigate("/onboarding");
+    }
+  }
 
   return (
     <div className="h-full overflow-y-auto">
@@ -231,9 +239,28 @@ export default function Profile() {
                     {profile.teachingStrategies.map((item) => <li key={item}>• {item}</li>)}
                   </ul>
                 </div>
+
+                <div className="pt-2.5 border-t border-black/[0.05] dark:border-white/[0.08] flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleReOnboard}
+                    className="px-4 py-2 rounded-xl border border-qz-primary/20 bg-qz-primary/5 hover:bg-qz-primary/10 text-qz-primary text-[12px] font-bold cursor-pointer transition-all duration-200 shadow-sm"
+                  >
+                    重新评测学习画像
+                  </button>
+                </div>
               </div>
             ) : (
-              <div className="text-[13px] text-qz-text-muted">还没有学习画像，可以去设置里重新测试。</div>
+              <div className="text-[13px] text-qz-text-muted flex flex-col gap-3">
+                <span>还没有学习画像，无法为您定制专属教学风格。</span>
+                <button
+                  type="button"
+                  onClick={handleReOnboard}
+                  className="px-4 py-2 rounded-xl bg-qz-primary hover:bg-qz-dark text-white text-[12px] font-bold cursor-pointer transition-all duration-200 self-start shadow-sm"
+                >
+                  去评测学习画像
+                </button>
+              </div>
             )}
           </div>
 

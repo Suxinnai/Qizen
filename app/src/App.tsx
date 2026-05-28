@@ -22,10 +22,6 @@ function RequireOnboarding() {
 }
 
 function OnboardingEntry() {
-  const data = loadAppData();
-  if (data.appState.onboardingCompleted) {
-    return <Navigate to="/dashboard" replace />;
-  }
   return <Onboarding />;
 }
 

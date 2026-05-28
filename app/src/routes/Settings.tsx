@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { testLlmConnection } from "../lib/llm";
 import { readLlmApiKey, resolveLlmProviderConfig, saveLlmApiKey } from "../lib/secretStore";
 import {
   getStudyInteractionCount,
   loadAppData,
   updateSettings,
+  resetOnboarding,
   type LlmProviderType,
 } from "../lib/storage";
 
@@ -64,12 +66,20 @@ function ValueRow({ label, value, status }: { label: string; value: string; stat
 }
 
 export default function Settings() {
+  const navigate = useNavigate();
   const initial = useMemo(() => loadAppData(), []);
   const [settings, setSettings] = useState(initial.settings);
   const [apiKeyDraft, setApiKeyDraft] = useState("");
   const [hasSavedApiKey, setHasSavedApiKey] = useState(Boolean(initial.settings.llm.apiKey));
   const [studyInteractionCount] = useState(getStudyInteractionCount(initial));
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>({ kind: "idle" });
+
+  function handleReOnboard() {
+    if (confirm("确定要重新进行学习画像评测吗？这将重置当前的四维分布分值并开始重新测试。")) {
+      resetOnboarding();
+      navigate("/onboarding");
+    }
+  }
 
   useEffect(() => {
     let disposed = false;
@@ -280,6 +290,21 @@ export default function Settings() {
 
                 <ValueRow label="默认番茄时长" value={`${settings.pomodoroMinutes} 分钟`} status="已接入" />
                 <ValueRow label="当前已记录学习交互" value={`${studyInteractionCount} 次`} status="已接入" />
+
+                <div className="flex items-center justify-between gap-4 rounded-[14px] border border-black/[0.05] dark:border-white/[0.08] px-4 py-3">
+                  <div>
+                    <div className="text-[14px] text-qz-text-strong dark:text-qz-text-dark font-medium">四维学习画像评估</div>
+                    <div className="text-[12px] text-qz-text-muted mt-1">重新测验您的 8 个问题，以重新生成您的视觉/听觉/阅读/动手学习偏好画像模型</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleReOnboard}
+                    className="px-4 py-2 rounded-xl bg-qz-primary/5 hover:bg-qz-primary/10 border border-qz-primary/20 text-qz-primary text-[12px] font-bold cursor-pointer transition-all duration-200 shrink-0"
+                  >
+                    重新评测画像
+                  </button>
+                </div>
+
                 <div className="rounded-[14px] border border-dashed border-rose-500/20 bg-rose-500/5 px-4 py-3">
                   <div className="flex items-center justify-between gap-3">
                     <div>
