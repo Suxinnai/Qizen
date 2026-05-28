@@ -17,7 +17,9 @@ import {
   BookOpen, 
   Activity,
   Award,
-  ChevronRight
+  ChevronRight,
+  Brain,
+  ShieldCheck
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -300,12 +302,29 @@ export default function Onboarding() {
                       栖知不会拿同一套死板的模式对待所有人。先用 8 个源自 VARK 认知行为学的小问题认识您的学习偏好，我会帮您把讲解节奏、图谱比重、摘要形态和练习配额，慢慢调节至最符合您天性的样子。
                     </p>
                     
-                    <div className="grid grid-cols-2 gap-4 text-[12.5px] text-qz-text-strong dark:text-qz-text-dark font-semibold mb-8 select-none">
-                      <div className="qz-card !p-4 border border-black/5 bg-black/[0.01] dark:bg-white/[0.01] hover:shadow-sm hover:border-[#2D7A6B]/20 transition-all duration-300">
-                        🎨 视觉/听觉/阅读/动手 四维剖析
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8 select-none">
+                      <div className="p-4 rounded-2xl border border-black/[0.04] dark:border-white/[0.06] bg-black/[0.005] dark:bg-white/[0.005] hover:border-qz-primary/20 dark:hover:border-[#5BA593]/20 hover:shadow-sm hover:bg-white dark:hover:bg-qz-card-dark transition-all duration-300 flex items-start gap-3.5 group">
+                        <div className="w-9 h-9 rounded-xl bg-[#E2F1EC] dark:bg-[#2D7A6B]/15 text-qz-primary dark:text-[#5BA593] flex items-center justify-center shrink-0 shadow-sm group-hover:scale-105 transition-transform duration-300">
+                          <Brain size={16} strokeWidth={2.4} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-[13px] font-bold text-qz-text-strong dark:text-qz-text-dark mb-0.5 font-serif">四维画像测算</h3>
+                          <p className="text-[11px] text-qz-text-muted leading-relaxed font-sans">
+                            多轴全面剖析视觉、听觉、阅读与动手倾向，精准建立认知画像。
+                          </p>
+                        </div>
                       </div>
-                      <div className="qz-card !p-4 border border-black/5 bg-black/[0.01] dark:bg-white/[0.01] hover:shadow-sm hover:border-[#2D7A6B]/20 transition-all duration-300">
-                        💾 结果本地加密保存，依后续行为微调
+
+                      <div className="p-4 rounded-2xl border border-black/[0.04] dark:border-white/[0.06] bg-black/[0.005] dark:bg-white/[0.005] hover:border-qz-primary/20 dark:hover:border-[#5BA593]/20 hover:shadow-sm hover:bg-white dark:hover:bg-qz-card-dark transition-all duration-300 flex items-start gap-3.5 group">
+                        <div className="w-9 h-9 rounded-xl bg-violet-50 dark:bg-violet-950/20 text-violet-600 dark:text-[#8B5CF6] flex items-center justify-center shrink-0 shadow-sm group-hover:scale-105 transition-transform duration-300">
+                          <ShieldCheck size={16} strokeWidth={2.4} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-[13px] font-bold text-qz-text-strong dark:text-qz-text-dark mb-0.5 font-serif">本地加密隐私</h3>
+                          <p className="text-[11px] text-qz-text-muted leading-relaxed font-sans">
+                            数据完全加密储存于您本地，无损隐私，伴随学习行为自我微调。
+                          </p>
+                        </div>
                       </div>
                     </div>
                     
