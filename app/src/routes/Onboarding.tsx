@@ -358,48 +358,33 @@ export default function Onboarding() {
                 
                 <div className="grid gap-4.5">
                   {QUESTIONS[step].options.map((option, idx) => {
-                    const theme = MODE_THEMES[option.value];
-                    const Icon = theme.icon;
+                    const letter = ["A", "B", "C", "D"][idx];
                     return (
                       <motion.button
                         key={idx}
                         whileHover={{ 
-                          scale: 1.015,
-                          borderColor: theme.color + "4D",
-                          backgroundColor: theme.color + "08",
-                          boxShadow: `0 4px 20px ${theme.glow}`
+                          scale: 1.012,
+                          borderColor: "rgba(45, 122, 107, 0.25)",
+                          backgroundColor: "rgba(45, 122, 107, 0.015)",
+                          boxShadow: "0 4px 16px rgba(45, 122, 107, 0.04)"
                         }}
                         whileTap={{ scale: 0.995 }}
                         type="button"
                         onClick={() => answer(option.value)}
-                        className="text-left p-5 rounded-[20px] border border-black/[0.05] dark:border-white/[0.08] bg-white dark:bg-white/[0.01] transition-all duration-300 cursor-pointer shadow-sm relative group flex items-start gap-4"
+                        className="text-left p-4.5 rounded-[20px] border border-black/[0.05] dark:border-white/[0.08] bg-white dark:bg-white/[0.01] transition-all duration-300 cursor-pointer shadow-sm relative group flex items-center gap-4"
                       >
-                        <div 
-                          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border transition-all duration-300"
-                          style={{
-                            backgroundColor: theme.color + "12",
-                            borderColor: theme.color + "2B",
-                            color: theme.color
-                          }}
-                        >
-                          <Icon size={16} strokeWidth={2.4} />
+                        {/* Elegant Circular Letter Badge */}
+                        <div className="w-9 h-9 rounded-full border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.02] text-qz-text-muted group-hover:border-qz-primary/30 group-hover:bg-[#E2F1EC] group-hover:text-qz-primary dark:group-hover:bg-[#2D7A6B]/20 dark:group-hover:text-[#5BA593] flex items-center justify-center shrink-0 text-[13px] font-bold font-sans transition-all duration-300">
+                          {letter}
                         </div>
-                        <div className="flex-1 min-w-0 pr-12">
+                        
+                        <div className="flex-1 min-w-0">
                           <div className="text-[14.5px] font-semibold text-qz-text-strong dark:text-qz-text-dark leading-snug group-hover:text-qz-primary dark:group-hover:text-white transition-colors duration-200">
                             {option.label}
                           </div>
                           <div className="text-[11.5px] text-qz-text-muted mt-1 font-medium font-sans">
                             {option.explanation}
                           </div>
-                        </div>
-                        
-                        {/* Beautiful Pill Badge */}
-                        <div className={clsx(
-                          "absolute right-5 top-5 text-[10px] font-bold font-sans px-2.5 py-0.5 rounded-full uppercase tracking-wider border select-none shrink-0",
-                          theme.bgLight,
-                          theme.bgDark
-                        )}>
-                          {theme.label}型
                         </div>
                       </motion.button>
                     );
