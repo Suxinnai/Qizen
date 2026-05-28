@@ -445,19 +445,19 @@ export default function Onboarding() {
                             theme.bgDark
                           )}
                         >
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5 mb-1 select-none">
-                              <span className={clsx("text-[10px] font-bold px-2 py-0.5 rounded-full border shadow-sm", theme.badgeLight, theme.badgeDark)}>
-                                {theme.label}
+                          <div className="min-w-0 flex-1 flex flex-col gap-2">
+                            <div className="flex items-center gap-2 select-none flex-wrap">
+                              <span className="font-serif text-[17px] font-bold text-qz-text-strong dark:text-qz-text-dark whitespace-nowrap">
+                                {theme.label}维度
                               </span>
                               {profile.dominantMode === optKey && (
-                                <span className="text-[9px] font-bold bg-[#1A5C4A] text-white rounded-full px-1.5 py-0.5 scale-90 border border-transparent">主导</span>
+                                <span className="text-[10px] font-bold bg-[#1A5C4A] text-white rounded-[6px] px-2 py-0.5 whitespace-nowrap shadow-sm font-sans">主导</span>
                               )}
                               {profile.secondaryMode === optKey && (
-                                <span className="text-[9px] font-bold bg-[#8B5CF6] text-white rounded-full px-1.5 py-0.5 scale-90 border border-transparent">辅助</span>
+                                <span className="text-[10px] font-bold bg-[#8B5CF6] text-white rounded-[6px] px-2 py-0.5 whitespace-nowrap shadow-sm font-sans">辅助</span>
                               )}
                             </div>
-                            <div className="font-serif text-[20px] font-bold text-qz-text-strong dark:text-qz-text-dark">{value} <span className="text-[11px] text-qz-text-muted font-sans font-medium">/ {QUESTIONS.length} 题</span></div>
+                            <div className="font-serif text-[22px] font-bold text-qz-primary dark:text-[#5BA593]">{value} <span className="text-[12px] text-qz-text-muted font-sans font-medium">/ {QUESTIONS.length} 题</span></div>
                           </div>
                           
                           {/* Radial Progress Ring SVG */}
