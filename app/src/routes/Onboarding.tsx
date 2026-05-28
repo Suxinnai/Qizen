@@ -343,7 +343,7 @@ export default function Onboarding() {
                 transition={{ duration: 0.3, ease: "easeInOut" }}
                 className="p-6 md:p-12 lg:p-14 w-full flex-1 flex flex-col justify-center"
               >
-                <div className="flex items-center justify-between mb-4.5 select-none">
+                <div className="flex items-center justify-between mb-5 select-none">
                   <div className="px-3 py-1 rounded-lg bg-black/[0.03] dark:bg-white/[0.04] border border-black/5 dark:border-white/5 text-[11px] font-bold text-qz-text-muted font-sans tracking-wide">
                     {QUESTIONS[step].category}
                   </div>
@@ -356,7 +356,7 @@ export default function Onboarding() {
                   {QUESTIONS[step].prompt}
                 </h2>
                 
-                <div className="grid gap-4.5">
+                <div className="grid gap-4">
                   {QUESTIONS[step].options.map((option, idx) => {
                     const letter = ["A", "B", "C", "D"][idx];
                     return (
@@ -371,7 +371,7 @@ export default function Onboarding() {
                         whileTap={{ scale: 0.995 }}
                         type="button"
                         onClick={() => answer(option.value)}
-                        className="text-left p-4.5 rounded-[20px] border border-black/[0.05] dark:border-white/[0.08] bg-white dark:bg-white/[0.01] transition-all duration-300 cursor-pointer shadow-sm relative group flex items-center gap-4"
+                        className="text-left p-5 rounded-[20px] border border-black/[0.05] dark:border-white/[0.08] bg-white dark:bg-white/[0.01] transition-all duration-300 cursor-pointer shadow-sm relative group flex items-center gap-4"
                       >
                         {/* Elegant Circular Letter Badge */}
                         <div className="w-9 h-9 rounded-full border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.02] text-qz-text-muted group-hover:border-qz-primary/30 group-hover:bg-[#E2F1EC] group-hover:text-qz-primary dark:group-hover:bg-[#2D7A6B]/20 dark:group-hover:text-[#5BA593] flex items-center justify-center shrink-0 text-[13px] font-bold font-sans transition-all duration-300">
@@ -409,7 +409,7 @@ export default function Onboarding() {
                 </div>
                 
                 {/* Title Highlight Card */}
-                <div className="p-6.5 rounded-[22px] border border-[#B5DCD3] dark:border-[#2D7A6B]/30 bg-[#E2F1EC]/20 dark:bg-[#2D7A6B]/5 mb-8 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-5 select-none">
+                <div className="p-6 rounded-[22px] border border-[#B5DCD3] dark:border-[#2D7A6B]/30 bg-[#E2F1EC]/20 dark:bg-[#2D7A6B]/5 mb-8 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-5 select-none">
                   <div className="min-w-0 flex-1">
                     <div className="text-[11.5px] font-bold text-qz-primary tracking-wider uppercase mb-1">主导/辅助复合学习画像</div>
                     <h2 className="font-serif text-[32px] md:text-[35px] text-[#1A5C4A] dark:text-[#5BA593] font-bold tracking-tight">
@@ -497,7 +497,7 @@ export default function Onboarding() {
                 </div>
 
                 {/* AI Advice & Strategies */}
-                <div className="grid md:grid-cols-[1fr,1.1fr] gap-6.5">
+                <div className="grid md:grid-cols-[1fr,1.1fr] gap-6">
                   <div className="p-6 rounded-[22px] border border-black/[0.05] dark:border-white/[0.06] bg-black/[0.005] dark:bg-white/[0.005] shadow-sm flex flex-col">
                     <div className="flex items-center gap-2 mb-3.5 text-qz-primary dark:text-[#5BA593] select-none">
                       <Compass size={16} className="animate-pulse" />
