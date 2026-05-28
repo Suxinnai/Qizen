@@ -221,12 +221,12 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="min-h-screen bg-qz-bg dark:bg-[#1C1C1E] text-qz-text dark:text-qz-text-dark flex items-center justify-center p-4 md:p-8 overflow-y-auto relative select-none">
+    <div className="h-screen w-screen bg-qz-bg dark:bg-[#1C1C1E] text-qz-text dark:text-qz-text-dark flex items-center justify-center p-4 md:p-6 overflow-hidden relative select-none">
       {/* Dynamic Background Glowing Orbs */}
       <div className="absolute top-[-10%] left-[-10%] w-[45vw] h-[45vw] rounded-full bg-[#2D7A6B]/[0.03] dark:bg-[#2D7A6B]/[0.05] blur-[120px] pointer-events-none z-0" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[45vw] h-[45vw] rounded-full bg-[#8B5CF6]/[0.02] dark:bg-[#8B5CF6]/[0.04] blur-[120px] pointer-events-none z-0" />
 
-      <div className="w-full max-w-4xl rounded-[28px] bg-white dark:bg-qz-card-dark shadow-[0_20px_60px_rgba(15,23,42,0.06)] dark:shadow-[0_20px_60px_rgba(0,0,0,0.3)] border border-black/[0.04] dark:border-white/[0.06] overflow-hidden z-10 flex flex-col min-h-[580px] relative backdrop-blur-3xl transition-all duration-300">
+      <div className="w-full max-w-4xl h-[85vh] max-h-[720px] min-h-[500px] rounded-[28px] bg-white dark:bg-qz-card-dark shadow-[0_20px_60px_rgba(15,23,42,0.06)] dark:shadow-[0_20px_60px_rgba(0,0,0,0.3)] border border-black/[0.04] dark:border-white/[0.06] overflow-hidden z-10 flex flex-col relative backdrop-blur-3xl transition-all duration-300">
         
         {/* Onboarding Header */}
         <div className="px-6 md:px-10 py-5 border-b border-black/[0.03] dark:border-white/[0.04] bg-white/40 dark:bg-black/10 backdrop-blur-md flex flex-col gap-4">
@@ -285,7 +285,7 @@ export default function Onboarding() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -15 }}
                 transition={{ duration: 0.35, ease: "easeInOut" }}
-                className="p-8 md:p-12 lg:p-16 flex flex-col md:flex-row gap-10 lg:gap-14 items-center"
+                className="p-6 md:p-10 lg:p-12 flex-1 flex flex-col md:flex-row gap-8 lg:gap-12 items-center justify-center overflow-y-auto scrollbar-thin"
               >
                 <div className="flex-1">
                   <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-qz-primary/10 text-qz-primary text-[11px] font-extrabold tracking-wider uppercase mb-5 select-none">
@@ -341,7 +341,7 @@ export default function Onboarding() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -25 }}
                 transition={{ duration: 0.3, ease: "easeInOut" }}
-                className="p-6 md:p-12 lg:p-14 w-full flex-1 flex flex-col justify-center"
+                className="p-6 md:p-10 lg:p-12 w-full flex-1 flex flex-col justify-center overflow-y-auto scrollbar-thin"
               >
                 <div className="flex items-center justify-between mb-5 select-none">
                   <div className="px-3 py-1 rounded-lg bg-black/[0.03] dark:bg-white/[0.04] border border-black/5 dark:border-white/5 text-[11px] font-bold text-qz-text-muted font-sans tracking-wide">
@@ -401,7 +401,7 @@ export default function Onboarding() {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.98 }}
                 transition={{ duration: 0.35, ease: "easeInOut" }}
-                className="p-6 md:p-10 lg:p-12 overflow-y-auto max-h-[72vh] scrollbar-thin"
+                className="p-6 md:p-10 overflow-y-auto flex-1 scrollbar-thin"
               >
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E2F1EC] dark:bg-[#2D7A6B]/20 text-qz-primary dark:text-[#5BA593] text-[11px] font-extrabold tracking-wider uppercase mb-5 select-none">
                   <Award size={12} strokeWidth={2.4} />
