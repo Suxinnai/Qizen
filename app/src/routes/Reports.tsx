@@ -3,11 +3,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   BarChart3,
   BookMarked,
-  Brain,
   CalendarDays,
   MessageSquareText,
   RotateCcw,
-  Sparkles,
   TrendingUp,
   Activity,
   Award,
@@ -375,7 +373,7 @@ function PracticeStatsCard({
       className="qz-card"
     >
       <div className="flex items-center gap-2 mb-4 text-qz-primary">
-        <Sparkles size={18} />
+        <Award size={18} />
         <h2 className="font-serif text-[22px] font-bold">练习统计</h2>
       </div>
 
@@ -487,7 +485,7 @@ function EventTimeline({
       case "ask":
         return <MessageSquareText size={8} className="text-white" />;
       case "practice-generated":
-        return <Sparkles size={8} className="text-white" />;
+        return <Activity size={8} className="text-white" />;
       case "practice-completed":
         return <Award size={8} className="text-white" />;
       case "progress-updated":
@@ -676,7 +674,7 @@ export default function Reports() {
           <StatCard
             label="练习生成"
             value={practiceEvents.length}
-            icon={Sparkles}
+            icon={Award}
             type="practice"
           />
         </div>
@@ -751,7 +749,7 @@ export default function Reports() {
             className="qz-card"
           >
             <div className="flex items-center gap-2 mb-4 text-qz-primary">
-              <Brain size={18} />
+              <BookMarked size={18} />
               <h2 className="font-serif text-[22px] font-bold">最近命中资料</h2>
             </div>
             {recentHitTitles.length > 0 ? (

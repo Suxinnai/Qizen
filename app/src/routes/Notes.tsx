@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { 
   Copy, 
   Download, 
-  Sparkles,
+  Lightbulb,
   BookOpen, 
   Edit2, 
   CheckCircle2, 
@@ -11,7 +11,7 @@ import {
   Columns,
   Maximize2,
   Minimize2,
-  Brain,
+  Compass,
   FileText,
   Clock
 } from "lucide-react";
@@ -300,9 +300,9 @@ export default function Notes() {
                         ? "bg-qz-primary/10 border-qz-primary/20 text-qz-primary" 
                         : "bg-white dark:bg-zinc-800 border-black/5 dark:border-white/5 text-qz-text-muted hover:text-qz-primary hover:border-qz-primary/20"
                     )}
-                    title={isRightCollapsed ? "展开 AI 重点" : "折叠 AI 重点"}
+                    title={isRightCollapsed ? "展开核心要点" : "折叠核心要点"}
                   >
-                    <Brain size={13.5} />
+                    <Compass size={13.5} />
                   </motion.button>
                 </div>
               </div>
@@ -491,7 +491,7 @@ export default function Notes() {
               {/* Card 1: Key Highlights */}
               <div className="qz-card !p-5 shadow-sm bg-white dark:bg-qz-card-dark border border-black/5 dark:border-white/5">
                 <div className="flex items-center gap-2 mb-3.5 text-qz-primary dark:text-qz-light select-none">
-                  <Sparkles size={15} />
+                  <Lightbulb size={15} />
                   <span className="font-serif text-[17px] font-bold">重点提取</span>
                 </div>
                 <ul className="space-y-3 text-[12.5px] leading-relaxed text-qz-text dark:text-qz-text-dark font-medium">

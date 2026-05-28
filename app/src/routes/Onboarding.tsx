@@ -9,7 +9,6 @@ import {
   type LearningScores,
 } from "../lib/storage";
 import { 
-  Sparkles, 
   ArrowLeft, 
   CheckCircle2, 
   Compass, 
@@ -290,7 +289,7 @@ export default function Onboarding() {
               >
                 <div className="flex-1">
                   <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-qz-primary/10 text-qz-primary text-[11px] font-extrabold tracking-wider uppercase mb-5 select-none">
-                    <Sparkles size={11} />
+                    <Compass size={11} />
                     <span>认知偏好引擎</span>
                   </div>
                   <h1 className="font-serif text-[38px] md:text-[44px] leading-tight text-qz-text-strong dark:text-qz-text-dark font-bold tracking-tight mb-5">
@@ -317,7 +316,7 @@ export default function Onboarding() {
                     className="px-6 py-3.5 rounded-2xl bg-qz-primary text-white text-[14px] font-bold hover:bg-[#205a4e] cursor-pointer shadow-[0_4px_16px_rgba(45,122,107,0.22)] transition-all duration-300 flex items-center gap-1.5"
                   >
                     <span>开启认知基因测试</span>
-                    <Sparkles size={13.5} />
+                    <Compass size={13.5} />
                   </motion.button>
                 </div>
                 
@@ -433,7 +432,7 @@ export default function Onboarding() {
                     </h2>
                   </div>
                   <div className="flex items-center gap-2.5 shrink-0 bg-white/70 dark:bg-zinc-900/60 backdrop-blur-md border border-black/5 dark:border-white/5 rounded-2xl px-5 py-3 shadow-[0_4px_12px_rgba(0,0,0,0.02)]">
-                    <Sparkles size={16} className="text-qz-primary shrink-0 animate-pulse" />
+                    <Leaf size={16} className="text-qz-primary shrink-0 animate-pulse" />
                     <span className="text-[13px] font-bold text-qz-text-strong dark:text-qz-text-dark font-serif">栖知高度契合</span>
                   </div>
                 </div>
@@ -516,7 +515,7 @@ export default function Onboarding() {
                 <div className="grid md:grid-cols-[1fr,1.1fr] gap-6.5">
                   <div className="p-6 rounded-[22px] border border-black/[0.05] dark:border-white/[0.06] bg-black/[0.005] dark:bg-white/[0.005] shadow-sm flex flex-col">
                     <div className="flex items-center gap-2 mb-3.5 text-qz-primary dark:text-[#5BA593] select-none">
-                      <Sparkles size={16} className="animate-pulse" />
+                      <Compass size={16} className="animate-pulse" />
                       <h3 className="font-serif text-[19px] font-bold">灵之眼 · 认知画像诊断</h3>
                     </div>
                     <p className="text-[13.5px] text-qz-text leading-7 font-sans flex-1">
