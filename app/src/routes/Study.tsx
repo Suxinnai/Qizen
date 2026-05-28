@@ -222,7 +222,7 @@ export default function Study() {
             className="qz-study-input-zone transition-all duration-300"
             style={{
               paddingLeft: isSessionsCollapsed ? "48px" : "16px",
-              paddingRight: (isSessionsCollapsed ? 48 : 16) + (session.activePanel ? 342 : 0) + "px"
+              paddingRight: isSessionsCollapsed ? "48px" : "16px"
             }}
           >
             <div className="qz-study-input-inner">

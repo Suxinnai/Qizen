@@ -1007,7 +1007,7 @@ body {
   right: 80px; /* 16px padding-right + 54px rail-width + 10px gap */
   top: 14px;
   z-index: 50;
-  max-height: calc(100% - 32px); /* 14px top + 18px bottom = 32px */
+  max-height: calc(100% - 104px); /* Float exactly above the input zone (leaves 90px at bottom) */
   pointer-events: auto;
 }
 
