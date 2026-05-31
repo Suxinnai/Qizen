@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -11,6 +12,7 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { Leaf } from "./icons/Leaf";
+import { loadAppData } from "../lib/storage";
 
 interface NavItem {
   to: string;
@@ -29,6 +31,19 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 export function Sidebar() {
+  const [data, setData] = useState(() => loadAppData());
+
+  useEffect(() => {
+    const handleSync = () => {
+      setData(loadAppData());
+    };
+    window.addEventListener("qizen-appdata-change", handleSync);
+    return () => window.removeEventListener("qizen-appdata-change", handleSync);
+  }, []);
+
+  const username = data.settings.username?.trim() || "学习者";
+  const avatarChar = username.charAt(0);
+
   return (
     <aside className="qz-sidebar select-none">
       {/* 1. Logo 品牌行 (独占一行，坚决防止挤压) */}
@@ -71,13 +86,13 @@ export function Sidebar() {
                 className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[12px] font-semibold"
                 style={{ background: "linear-gradient(135deg, #5BA593 0%, #2D7A6B 100%)" }}
               >
-                沐
+                {avatarChar}
               </div>
               <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-qz-mastered border border-white dark:border-qz-bg-dark" />
             </div>
             <div className="flex flex-col leading-tight min-w-0 flex-1">
-              <span className="text-[12.5px] font-semibold text-qz-text-strong dark:text-qz-text-dark truncate">沐灵</span>
-              <span className="text-[10px] text-qz-mastered font-medium">在线</span>
+              <span className="text-[12.5px] font-semibold text-qz-text-strong dark:text-qz-text-dark truncate">{username}</span>
+              <span className="text-[10px] text-qz-mastered font-medium">本地学习档案</span>
             </div>
           </NavLink>
 

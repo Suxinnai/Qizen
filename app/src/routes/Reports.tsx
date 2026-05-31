@@ -350,8 +350,8 @@ function PracticeStatsCard({
   events: { type: string }[];
   practiceSets: { status: string }[];
 }) {
-  const generated = events.filter((e) => e.type === "practice-generated").length + practiceSets.length;
-  const completed = practiceSets.filter((p) => p.status === "completed").length;
+  const generated = events.filter((e) => e.type === "practice-generated").length;
+  const completed = events.filter((e) => e.type === "practice-completed").length + practiceSets.filter((p) => p.status === "completed").length;
   const percentage = generated > 0 ? Math.round((completed / generated) * 100) : 0;
 
   // Dynamic feedback text

@@ -1,4 +1,4 @@
-import { Mic, Paperclip, SendHorizonal } from "lucide-react";
+import { SendHorizonal } from "lucide-react";
 import clsx from "clsx";
 
 export function StudyInput({
@@ -14,10 +14,6 @@ export function StudyInput({
 }) {
   return (
     <div className="qz-study-composer">
-      <button type="button" className="qz-composer-tool" aria-label="添加附件">
-        <Paperclip size={18} />
-      </button>
-      
       <input
         id="qz-study-input"
         name="study-message"
@@ -37,9 +33,6 @@ export function StudyInput({
       />
 
       <div className="flex items-center gap-2">
-        <button type="button" className="qz-composer-tool" aria-label="语音输入">
-          <Mic size={18} />
-        </button>
         <button
           type="button"
           aria-label="发送消息"

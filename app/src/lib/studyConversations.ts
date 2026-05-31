@@ -32,6 +32,19 @@ export interface PersistedStudyConversation {
     id: string;
     role: "assistant" | "user";
     content: string;
+    kind?: "normal" | "plan" | "agent";
+    streamState?: "streaming" | "done";
+    thinking?: string[];
+    planSteps?: Array<{ id: string; title: string; minutes: number }>;
+    resourceLeads?: Array<{
+      id: string;
+      title: string;
+      type: "course" | "article" | "video" | "practice" | "local";
+      source: string;
+      reason: string;
+      url?: string;
+      live?: boolean;
+    }>;
     triggers?: Array<"pomodoro" | "resource" | "note" | "graph">;
     rag?: unknown;
     providerLabel?: string;
@@ -174,6 +187,10 @@ export function getActiveStudyConversationId() {
 export function setActiveStudyConversationId(id: string | null) {
   const store = readStore();
   writeStore({ ...store, activeId: id });
+}
+
+export function clearStudyConversations() {
+  writeStore(defaultStore());
 }
 
 export function getStudySidebarMode(): StudySidebarMode {

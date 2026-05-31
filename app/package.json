@@ -7,6 +7,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "verify:delivery": "node scripts/verify-delivery.cjs",
+    "check:delivery": "node scripts/check-delivery.mjs",
+    "smoke:resources": "node scripts/resource-agent-smoke.mjs",
+    "smoke:visual": "node scripts/visual-smoke.cjs",
     "preview": "vite preview",
     "electron:dev": "node electron/dev.cjs",
     "electron:preview": "pnpm build && electron .",

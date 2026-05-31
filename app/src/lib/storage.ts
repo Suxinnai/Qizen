@@ -36,6 +36,7 @@ export interface LlmProviderConfig {
 }
 
 export interface AppSettings {
+  username?: string;
   pomodoroMinutes: number;
   preferredStyle: TeachingStyle;
   remindersEnabled: boolean;
@@ -232,6 +233,7 @@ export interface UploadableFile {
 const STORAGE_KEY = "qizen:mvp:v2";
 
 const defaultSettings: AppSettings = {
+  username: "",
   pomodoroMinutes: 25,
   preferredStyle: "analogy",
   remindersEnabled: true,
@@ -283,176 +285,15 @@ function inferTags(fileName: string): string[] {
 }
 
 function seedGoals(): Goal[] {
-  return [
-    {
-      id: "goal-math",
-      title: "高数上",
-      description: "本学期期末前完成微分与中值定理的理解和练习。",
-      status: "active",
-      progress: 0.35,
-      subject: "数学",
-      milestones: [
-        {
-          id: "math-m1",
-          title: "第 3 章 微分中值定理",
-          done: false,
-          tasks: [
-            {
-              id: "task-math-1",
-              title: "复习《人类简史》第 4 章",
-              meta: "约 25 分钟 · 阅读",
-              estimatedMinutes: 25,
-              done: true,
-            },
-            {
-              id: "task-math-2",
-              title: "完成线性代数练习册 P12-15",
-              meta: "约 40 分钟 · 练习",
-              estimatedMinutes: 40,
-              done: false,
-            },
-          ],
-        },
-        {
-          id: "math-m2",
-          title: "第 4 章 导数应用",
-          done: false,
-          tasks: [
-            {
-              id: "task-math-3",
-              title: "整理产品设计课堂笔记",
-              meta: "约 15 分钟 · 笔记",
-              estimatedMinutes: 15,
-              done: false,
-            },
-          ],
-        },
-      ],
-    },
-    {
-      id: "goal-english",
-      title: "考研英语",
-      description: "稳步建立阅读理解和词汇复习节奏。",
-      status: "active",
-      progress: 0.12,
-      subject: "英语",
-      milestones: [
-        {
-          id: "eng-m1",
-          title: "Unit 12 词汇强化",
-          done: false,
-          tasks: [
-            {
-              id: "task-eng-1",
-              title: "英语词汇 · Unit 12",
-              meta: "约 12 分钟 · 复习",
-              estimatedMinutes: 12,
-              done: false,
-            },
-          ],
-        },
-      ],
-    },
-    {
-      id: "goal-python",
-      title: "Python 入门",
-      description: "已完成的技能型目标，用来展示已完成状态。",
-      status: "done",
-      progress: 1,
-      subject: "编程",
-      milestones: [
-        {
-          id: "py-m1",
-          title: "基础语法与函数",
-          done: true,
-          tasks: [
-            {
-              id: "task-py-1",
-              title: "完成基础语法练习",
-              meta: "约 30 分钟 · 练习",
-              estimatedMinutes: 30,
-              done: true,
-            },
-          ],
-        },
-      ],
-    },
-  ];
+  return [];
 }
 
 function seedNotes(): NoteItem[] {
-  return [
-    {
-      id: "note-1",
-      title: "拉格朗日中值定理",
-      topic: "高数",
-      content:
-        "# 拉格朗日中值定理\n\n如果函数在闭区间上连续、在开区间内可导，那么一定存在一点 c，使得整体平均变化率等于某一点的瞬时变化率。\n\n- 关键词：连续、可导、某一点 c\n- 直觉：从起点开到终点，总有一瞬间速度等于平均速度\n\n> 它是把整体和局部连接起来的桥。",
-      aiKeyPoints: ["闭区间连续", "开区间可导", "平均变化率 = 某点导数"],
-      confusingPoints: ["不要忘记端点连续条件", "罗尔定理是它的特殊情况"],
-      updatedAt: new Date().toISOString(),
-    },
-  ];
+  return [];
 }
 
 function seedLibraryItems(): LibraryItem[] {
-  return [
-    {
-      id: "library-1",
-      title: "微积分学习手册",
-      originalFileName: "微积分学习手册.pdf",
-      type: "PDF",
-      course: "高数上",
-      sizeBytes: 2_420_000,
-      sizeLabel: formatBytes(2_420_000),
-      status: "indexed",
-      tags: ["微积分", "定理", "概念"],
-      addedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 4).toISOString(),
-      parserStatus: "parsed",
-      extractedText: "微积分学习手册节选：拉格朗日中值定理要求函数在闭区间上连续、在开区间内可导。它说明整体平均变化率一定能在某一点对应到瞬时变化率。几何上可以理解为某点切线与端点割线平行。",
-      preview: "拉格朗日中值定理要求函数在闭区间上连续、在开区间内可导。它把整体平均变化率与局部瞬时变化率联系起来。",
-      summary: "这份资料主要讲中值定理的使用条件、几何意义，以及和罗尔定理之间的关系。适合拿来快速回顾概念。",
-      highlights: ["闭区间连续", "开区间可导", "切线平行于割线"],
-      linkedNodeIds: ["node-continuity", "node-rolle", "node-mvt"],
-      pageCount: 24,
-    },
-    {
-      id: "library-2",
-      title: "第 3 章课堂笔记",
-      originalFileName: "第3章课堂笔记.md",
-      type: "MARKDOWN",
-      course: "高数上",
-      sizeBytes: 16_400,
-      sizeLabel: formatBytes(16_400),
-      status: "indexed",
-      tags: ["微积分", "笔记"],
-      addedAt: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
-      parserStatus: "parsed",
-      extractedText: "# 第 3 章 微分中值定理\n\n- 罗尔定理是中值定理的特殊情况\n- 拉格朗日中值定理说明平均变化率与瞬时变化率的联系\n- 柯西中值定理是进一步推广\n\n> 证明题里要先验条件，再套结论。",
-      preview: "罗尔定理是中值定理的特殊情况；拉格朗日中值定理说明平均变化率与瞬时变化率的联系。",
-      summary: "这是课堂笔记型资料，信息比较凝练，适合用来抽重点和生成判断题。",
-      highlights: ["罗尔定理是特殊情况", "先验条件，再套结论", "可用于判断题生成"],
-      linkedNodeIds: ["node-rolle", "node-mvt", "node-cauchy"],
-    },
-    {
-      id: "library-3",
-      title: "中值定理例题合集",
-      originalFileName: "中值定理例题合集.docx",
-      type: "DOCX",
-      course: "高数上",
-      sizeBytes: 680_000,
-      sizeLabel: formatBytes(680_000),
-      status: "indexed",
-      tags: ["微积分", "练习"],
-      addedAt: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
-      parserStatus: "partial",
-      extractedText: "文档内容暂未做完整解析，但已识别为中值定理相关例题资料。",
-      preview: "例题合集，适合后续生成专项练习。",
-      summary: "当前版本能识别这是中值定理练习资料，但对 DOCX 的正文解析还只做到基础元信息层。",
-      highlights: ["中值定理例题", "适合专项练习", "后续补 DOCX 深度解析"],
-      linkedNodeIds: ["node-mvt", "node-applications"],
-    },
-  ];
+  return [];
 }
 
 function inferNodeKind(label: string): KnowledgeNodeKind {
@@ -581,152 +422,19 @@ function createPracticeQuestionsFromText(
 }
 
 function seedPracticeSets(): PracticeSet[] {
-  return [
-    {
-      id: "practice-1",
-      title: "基于《微积分学习手册》生成的 8 题基础练习",
-      resourceId: "library-1",
-      difficulty: "基础",
-      questionCount: 8,
-      status: "ready",
-      generatedAt: new Date(Date.now() - 1000 * 60 * 60 * 8).toISOString(),
-      questions: createPracticeQuestionsFromText(
-        "微积分学习手册",
-        "讲中值定理的使用条件、几何意义，以及和罗尔定理之间的关系。",
-        ["闭区间连续", "开区间可导", "切线平行于割线"],
-        "基础"
-      ),
-    },
-    {
-      id: "practice-2",
-      title: "中值定理判断题 · 6 题",
-      resourceId: "library-2",
-      difficulty: "进阶",
-      questionCount: 6,
-      status: "ready",
-      generatedAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
-      questions: createPracticeQuestionsFromText(
-        "第 3 章课堂笔记",
-        "课堂笔记型资料，信息凝练，适合抽重点和生成判断题。",
-        ["罗尔定理是特殊情况", "先验条件，再套结论", "可用于判断题生成"],
-        "进阶"
-      ),
-    },
-    {
-      id: "practice-3",
-      title: "导数应用综合小测",
-      resourceId: null,
-      difficulty: "综合",
-      questionCount: 10,
-      status: "ready",
-      generatedAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-      questions: createPracticeQuestionsFromText(
-        "导数应用综合小测",
-        "把中值定理与导数应用题联系起来。",
-        ["中值定理", "导数应用", "证明题"],
-        "综合"
-      ),
-    },
-  ];
+  return [];
 }
 
 function seedKnowledgeGraph(): KnowledgeGraph {
   return {
-    nodes: [
-      {
-        id: "node-limits",
-        label: "极限",
-        kind: "concept",
-        state: "mastered",
-        x: 140,
-        y: 120,
-        summary: "理解函数趋近过程，是连续与导数的前提。",
-        related: ["node-continuity", "node-derivative"],
-        studyHint: "已经掌握，可以作为回忆入口。",
-      },
-      {
-        id: "node-continuity",
-        label: "连续性",
-        kind: "concept",
-        state: "mastered",
-        x: 300,
-        y: 90,
-        summary: "中值定理的使用条件之一是闭区间连续。",
-        related: ["node-limits", "node-rolle", "node-mvt"],
-        studyHint: "重点回忆闭区间连续这个前置条件。",
-      },
-      {
-        id: "node-derivative",
-        label: "导数",
-        kind: "concept",
-        state: "mastered",
-        x: 300,
-        y: 250,
-        summary: "中值定理的第二个关键前提是开区间可导。",
-        related: ["node-limits", "node-rolle", "node-mvt", "node-applications"],
-        studyHint: "和瞬时变化率概念直接相关。",
-      },
-      {
-        id: "node-rolle",
-        label: "罗尔定理",
-        kind: "theorem",
-        state: "mastered",
-        x: 470,
-        y: 90,
-        summary: "中值定理的特殊形式，是很多证明的起点。",
-        related: ["node-continuity", "node-derivative", "node-mvt"],
-        studyHint: "先想等高端点，再过渡到一般中值定理。",
-      },
-      {
-        id: "node-mvt",
-        label: "中值定理",
-        kind: "theorem",
-        state: "current",
-        x: 510,
-        y: 180,
-        summary: "把整体平均变化率和局部瞬时变化率连接起来。",
-        related: ["node-rolle", "node-cauchy", "node-applications"],
-        studyHint: "当前学习核心，先抓几何意义再记条件。",
-      },
-      {
-        id: "node-cauchy",
-        label: "柯西中值定理",
-        kind: "theorem",
-        state: "next",
-        x: 700,
-        y: 130,
-        summary: "中值定理的推广形式，为不等式和极限证明提供工具。",
-        related: ["node-mvt"],
-        studyHint: "下一步会自然接上。",
-      },
-      {
-        id: "node-applications",
-        label: "导数应用",
-        kind: "application",
-        state: "locked",
-        x: 720,
-        y: 260,
-        summary: "用中值定理处理单调性、估值和证明题。",
-        related: ["node-derivative", "node-mvt"],
-        studyHint: "先学懂中值定理，再去做应用题。",
-      },
-    ],
-    edges: [
-      { id: "edge-1", source: "node-limits", target: "node-continuity" },
-      { id: "edge-2", source: "node-limits", target: "node-derivative" },
-      { id: "edge-3", source: "node-continuity", target: "node-rolle" },
-      { id: "edge-4", source: "node-derivative", target: "node-rolle" },
-      { id: "edge-5", source: "node-rolle", target: "node-mvt" },
-      { id: "edge-6", source: "node-derivative", target: "node-mvt" },
-      { id: "edge-7", source: "node-mvt", target: "node-cauchy" },
-      { id: "edge-8", source: "node-mvt", target: "node-applications" },
-    ],
+    nodes: [],
+    edges: [],
   };
 }
 
 function seedStats(): StudyStats {
   return {
-    dailyMinutes: [18, 32, 24, 46, 38, 52, 28, 16, 22, 40, 58, 44, 30, 26, 50, 62, 48, 36, 20, 34, 56, 42, 28, 18, 38, 60, 54, 46, 32, 24],
+    dailyMinutes: Array.from({ length: 30 }, () => 0),
   };
 }
 
@@ -781,6 +489,46 @@ function normalizeLibraryItem(item: Partial<LibraryItem>): LibraryItem {
   };
 }
 
+const LEGACY_SEED_GOAL_IDS = new Set(["goal-math", "goal-english", "goal-python"]);
+const LEGACY_SEED_NOTE_IDS = new Set(["note-1"]);
+const LEGACY_SEED_LIBRARY_IDS = new Set(["library-1", "library-2", "library-3"]);
+const LEGACY_SEED_PRACTICE_IDS = new Set(["practice-1", "practice-2", "practice-3"]);
+const LEGACY_SEED_NODE_IDS = new Set([
+  "node-limits",
+  "node-continuity",
+  "node-derivative",
+  "node-rolle",
+  "node-mvt",
+  "node-cauchy",
+  "node-applications",
+]);
+const LEGACY_SEED_STATS = [18, 32, 24, 46, 38, 52, 28, 16, 22, 40, 58, 44, 30, 26, 50, 62, 48, 36, 20, 34, 56, 42, 28, 18, 38, 60, 54, 46, 32, 24];
+
+function isLegacySeedStats(minutes?: number[]) {
+  return Array.isArray(minutes) && minutes.length === LEGACY_SEED_STATS.length && minutes.every((value, index) => value === LEGACY_SEED_STATS[index]);
+}
+
+function normalizeKnowledgeGraph(graph?: Partial<KnowledgeGraph>): KnowledgeGraph {
+  if (!graph || !Array.isArray(graph.nodes)) return seedKnowledgeGraph();
+  const nodes = graph.nodes.filter((node): node is KnowledgeNode => {
+    return Boolean(node && typeof node.id === "string" && !LEGACY_SEED_NODE_IDS.has(node.id));
+  });
+  const nodeIds = new Set(nodes.map((node) => node.id));
+  const edges = Array.isArray(graph.edges)
+    ? graph.edges.filter((edge): edge is KnowledgeEdge => {
+        return Boolean(
+          edge &&
+            typeof edge.id === "string" &&
+            typeof edge.source === "string" &&
+            typeof edge.target === "string" &&
+            nodeIds.has(edge.source) &&
+            nodeIds.has(edge.target)
+        );
+      })
+    : [];
+  return { nodes, edges };
+}
+
 export function loadAppData(): AppData {
   if (!canUseStorage()) return defaultData();
   const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -792,7 +540,7 @@ export function loadAppData(): AppData {
 
   try {
     const parsed = JSON.parse(raw) as Partial<AppData>;
-    return {
+    const data: AppData = {
       appState: parsed.appState ?? { onboardingCompleted: false },
       learningProfile: parsed.learningProfile ?? null,
       settings: {
@@ -803,14 +551,21 @@ export function loadAppData(): AppData {
           ...(parsed.settings?.llm ?? {}),
         },
       },
-      goals: parsed.goals?.length ? parsed.goals : seedGoals(),
-      notes: parsed.notes?.length ? parsed.notes : seedNotes(),
+      goals: Array.isArray(parsed.goals) ? parsed.goals.filter((goal) => !LEGACY_SEED_GOAL_IDS.has(goal.id)) : seedGoals(),
+      notes: Array.isArray(parsed.notes) ? parsed.notes.filter((note) => !LEGACY_SEED_NOTE_IDS.has(note.id)) : seedNotes(),
       libraryItems: parsed.libraryItems?.length
-        ? parsed.libraryItems.map((item) => normalizeLibraryItem(item as Partial<LibraryItem>))
+        ? parsed.libraryItems
+            .filter((item) => !LEGACY_SEED_LIBRARY_IDS.has((item as Partial<LibraryItem>).id ?? ""))
+            .map((item) => normalizeLibraryItem(item as Partial<LibraryItem>))
         : seedLibraryItems(),
-      practiceSets: parsed.practiceSets?.length ? parsed.practiceSets : seedPracticeSets(),
-      knowledgeGraph: parsed.knowledgeGraph?.nodes?.length ? parsed.knowledgeGraph : seedKnowledgeGraph(),
-      studyStats: parsed.studyStats?.dailyMinutes?.length ? parsed.studyStats : seedStats(),
+      practiceSets: parsed.practiceSets?.length
+        ? parsed.practiceSets.filter((practice) => !LEGACY_SEED_PRACTICE_IDS.has(practice.id))
+        : seedPracticeSets(),
+      knowledgeGraph: normalizeKnowledgeGraph(parsed.knowledgeGraph),
+      studyStats:
+        parsed.studyStats?.dailyMinutes?.length && !isLegacySeedStats(parsed.studyStats.dailyMinutes)
+          ? parsed.studyStats
+          : seedStats(),
       studyRecord: {
         events: Array.isArray(parsed.studyRecord?.events)
           ? parsed.studyRecord.events.filter((event): event is StudySessionEvent => {
@@ -819,6 +574,10 @@ export function loadAppData(): AppData {
           : [],
       },
     };
+    if (JSON.stringify(data) !== raw) {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+    return data;
   } catch {
     const data = defaultData();
     saveAppData(data);
@@ -829,6 +588,7 @@ export function loadAppData(): AppData {
 export function saveAppData(data: AppData) {
   if (!canUseStorage()) return;
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  window.dispatchEvent(new CustomEvent("qizen-appdata-change", { detail: data }));
 }
 
 export function updateAppData(updater: (data: AppData) => AppData) {
@@ -913,15 +673,111 @@ export function updateSettings(patch: Partial<AppSettings>) {
 export function toggleTask(taskId: string) {
   return updateAppData((data) => ({
     ...data,
-    goals: data.goals.map((goal) => ({
-      ...goal,
-      milestones: goal.milestones.map((milestone) => ({
-        ...milestone,
-        tasks: milestone.tasks.map((task) =>
+    goals: data.goals.map((goal) => {
+      const milestones = goal.milestones.map((milestone) => {
+        const tasks = milestone.tasks.map((task) =>
           task.id === taskId ? { ...task, done: !task.done } : task
-        ),
-      })),
-    })),
+        );
+        return {
+          ...milestone,
+          done: tasks.length > 0 && tasks.every((task) => task.done),
+          tasks,
+        };
+      });
+      const tasks = milestones.flatMap((milestone) => milestone.tasks);
+      const progress = tasks.length > 0 ? tasks.filter((task) => task.done).length / tasks.length : 0;
+      return {
+        ...goal,
+        milestones,
+        progress,
+        status: progress >= 1 ? "done" : goal.status === "done" ? "active" : goal.status,
+      };
+    }),
+  }));
+}
+
+export function addGoal(input: { title: string; description?: string; subject?: string; firstTaskTitle?: string; estimatedMinutes?: number }) {
+  const now = Date.now();
+  const title = input.title.trim();
+  const firstTaskTitle = (input.firstTaskTitle ?? title).trim();
+  return updateAppData((data) => ({
+    ...data,
+    goals: [
+      {
+        id: `goal-${now}`,
+        title,
+        description: input.description?.trim() || "从一个明确任务开始推进。",
+        status: "active",
+        progress: 0,
+        subject: input.subject?.trim() || "未分类",
+        milestones: [
+          {
+            id: `milestone-${now}`,
+            title: "第一阶段",
+            done: false,
+            tasks: [
+              {
+                id: `task-${now}`,
+                title: firstTaskTitle,
+                meta: `约 ${input.estimatedMinutes ?? 25} 分钟 · 学习`,
+                estimatedMinutes: input.estimatedMinutes ?? 25,
+                done: false,
+              },
+            ],
+          },
+        ],
+      },
+      ...data.goals,
+    ],
+  }));
+}
+
+export function addLearningPlanGoal(input: {
+  title: string;
+  description?: string;
+  subject?: string;
+  steps: Array<{ title: string; minutes: number }>;
+}) {
+  const now = Date.now();
+  const title = input.title.trim() || "新的学习计划";
+  const steps = input.steps.length > 0 ? input.steps : [{ title, minutes: 25 }];
+  const midpoint = Math.max(1, Math.ceil(steps.length / 2));
+  const groups = [steps.slice(0, midpoint), steps.slice(midpoint)].filter((group) => group.length > 0);
+
+  return updateAppData((data) => ({
+    ...data,
+    goals: [
+      {
+        id: `goal-${now}`,
+        title,
+        description: input.description?.trim() || "由学习对话确认后生成的执行计划。",
+        status: "active",
+        progress: 0,
+        subject: input.subject?.trim() || "AI 学习计划",
+        milestones: groups.map((group, groupIndex) => ({
+          id: `milestone-${now}-${groupIndex}`,
+          title: groupIndex === 0 ? "建立理解" : "练习巩固",
+          done: false,
+          tasks: group.map((step, stepIndex) => ({
+            id: `task-${now}-${groupIndex}-${stepIndex}`,
+            title: step.title.trim() || `学习任务 ${groupIndex * midpoint + stepIndex + 1}`,
+            meta: `约 ${Math.max(5, Math.round(step.minutes))} 分钟 · 学习计划`,
+            estimatedMinutes: Math.max(5, Math.round(step.minutes)),
+            done: false,
+          })),
+        })),
+      },
+      ...data.goals,
+    ],
+  }));
+}
+
+export function updatePracticeSetStatus(practiceSetId: string, status: PracticeStatus) {
+  return updateAppData((data) => ({
+    ...data,
+    practiceSets: data.practiceSets.map((practiceSet) =>
+      practiceSet.id === practiceSetId ? { ...practiceSet, status } : practiceSet
+    ),
   }));
 }
 
@@ -932,6 +788,35 @@ export function updateNote(noteId: string, content: string) {
       note.id === noteId ? { ...note, content, updatedAt: new Date().toISOString() } : note
     ),
   }));
+}
+
+export function addNote(input: { title: string; topic?: string; content?: string }) {
+  const now = new Date().toISOString();
+  return updateAppData((data) => ({
+    ...data,
+    notes: [
+      {
+        id: `note-${Date.now()}`,
+        title: input.title.trim(),
+        topic: input.topic?.trim() || "未分类",
+        content: input.content ?? "",
+        aiKeyPoints: [],
+        confusingPoints: [],
+        updatedAt: now,
+      },
+      ...data.notes,
+    ],
+  }));
+}
+
+export function exportAppData() {
+  return JSON.stringify(loadAppData(), null, 2);
+}
+
+export function resetAppData() {
+  const data = defaultData();
+  saveAppData(data);
+  return data;
 }
 
 export function addLibraryFiles(files: UploadableFile[]) {
@@ -952,46 +837,16 @@ export function addLibraryFiles(files: UploadableFile[]) {
         addedAt,
         parserStatus: "unsupported",
         extractedText: "",
-        preview: "暂未解析正文。",
-        summary: "当前仅完成资料收纳，正文解析尚未执行。",
-        highlights: ["待解析"],
+        preview: "",
+        summary: "这份资料已收纳，正文解析需要通过资料库上传入口完成。",
+        highlights: [],
         linkedNodeIds: [],
       };
     });
 
-    const newPracticeSets: PracticeSet[] = newLibraryItems.map((item, index) => {
-      const difficulty = item.type === "PDF" ? "基础" : item.type === "DOCX" ? "进阶" : "综合";
-      const questionCount = item.type === "PDF" ? 8 : item.type === "DOCX" ? 6 : 5;
-      return {
-        id: `practice-upload-${Date.now()}-${index}`,
-        title: `基于《${item.title}》生成的 ${questionCount} 题练习`,
-        resourceId: item.id,
-        difficulty,
-        questionCount,
-        status: "ready",
-        generatedAt: addedAt,
-        questions: createPracticeQuestionsFromText(item.title, item.summary, item.highlights, difficulty),
-      };
-    });
-
-    const parsedItems = newLibraryItems.filter((item) => item.parserStatus !== "unsupported");
-    const nextGraph = parsedItems.length > 0
-      ? buildKnowledgeNodesFromLibraryItems(
-          data.knowledgeGraph,
-          parsedItems.map((item) => ({
-            title: item.title,
-            summary: item.summary,
-            highlights: item.highlights,
-            linkedNodeIds: item.linkedNodeIds,
-          })),
-        )
-      : data.knowledgeGraph;
-
     return {
       ...data,
       libraryItems: [...newLibraryItems, ...data.libraryItems],
-      practiceSets: [...newPracticeSets, ...data.practiceSets],
-      knowledgeGraph: nextGraph,
     };
   });
 }
@@ -1058,6 +913,11 @@ export function appendStudySessionEvent(event: StudySessionEvent) {
     ...data,
     studyRecord: {
       events: [...data.studyRecord.events, event],
+    },
+    studyStats: {
+      dailyMinutes: data.studyStats.dailyMinutes.map((minutes, index, list) =>
+        index === list.length - 1 ? minutes + (event.type === "ask" ? 3 : event.type === "practice-completed" ? 5 : 1) : minutes
+      ),
     },
   }));
 }

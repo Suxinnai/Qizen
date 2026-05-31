@@ -17,11 +17,11 @@ import {
   Sparkles,
   CheckCircle2
 } from "lucide-react";
-import { loadAppData } from "../lib/storage";
+import { addGoal, loadAppData } from "../lib/storage";
 
 export default function Goals() {
   const navigate = useNavigate();
-  const data = useMemo(() => loadAppData(), []);
+  const [data, setData] = useState(() => loadAppData());
   const [selectedGoalId, setSelectedGoalId] = useState(data.goals[0]?.id ?? "");
   const [expandedMilestones, setExpandedMilestones] = useState<Record<string, boolean>>({});
 
@@ -30,7 +30,7 @@ export default function Goals() {
   // Helper for task icon selection
   const getTaskIcon = (title: string, meta: string) => {
     const searchStr = (title + " " + meta).toLowerCase();
-    if (searchStr.includes("阅读") || searchStr.includes("read") || searchStr.includes("书") || searchStr.includes("人类简史")) {
+    if (searchStr.includes("阅读") || searchStr.includes("read") || searchStr.includes("书")) {
       return <BookOpen size={15} className="text-blue-500 dark:text-blue-400" />;
     }
     if (searchStr.includes("练习") || searchStr.includes("practice") || searchStr.includes("题") || searchStr.includes("册")) {
@@ -48,7 +48,7 @@ export default function Goals() {
   // Helper to get soft colorful background for task icons
   const getTaskIconBg = (title: string, meta: string) => {
     const searchStr = (title + " " + meta).toLowerCase();
-    if (searchStr.includes("阅读") || searchStr.includes("read") || searchStr.includes("书") || searchStr.includes("人类简史")) {
+    if (searchStr.includes("阅读") || searchStr.includes("read") || searchStr.includes("书")) {
       return "bg-blue-50 dark:bg-blue-950/40 border-blue-100 dark:border-blue-900/30";
     }
     if (searchStr.includes("练习") || searchStr.includes("practice") || searchStr.includes("题") || searchStr.includes("册")) {
@@ -167,6 +167,14 @@ export default function Goals() {
     return { total, active, completed };
   }, [data]);
 
+  function handleCreateGoal() {
+    const title = window.prompt("请输入新目标名称");
+    if (!title?.trim()) return;
+    const next = addGoal({ title, firstTaskTitle: title });
+    setData(next);
+    setSelectedGoalId(next.goals[0]?.id ?? "");
+  }
+
   return (
     <div className="h-full overflow-y-auto bg-qz-bg dark:bg-qz-bg-dark transition-colors duration-200">
       <div className="p-8 max-w-[1180px] mx-auto flex flex-col gap-8">
@@ -196,14 +204,29 @@ export default function Goals() {
               </div>
             </div>
 
-            <button className="qz-btn-primary h-10 px-5 text-[13px] flex items-center justify-center gap-2 group shadow-md transition-all duration-300 leading-none">
+            <button
+              type="button"
+              onClick={handleCreateGoal}
+              className="qz-btn-primary h-10 px-5 text-[13px] flex items-center justify-center gap-2 group shadow-md transition-all duration-300 leading-none"
+            >
               <Plus size={15} className="group-hover:rotate-90 transition-transform duration-300 shrink-0" />
               <span>新建目标</span>
             </button>
           </div>
         </div>
 
-        {/* Goal Cards Grid */}
+        {data.goals.length === 0 ? (
+          <div className="qz-card min-h-[280px] flex flex-col items-center justify-center text-center gap-4">
+            <Target size={30} className="text-qz-primary" />
+            <div>
+              <div className="font-serif text-[22px] text-qz-text-strong dark:text-qz-text-dark">还没有学习目标</div>
+              <p className="mt-2 text-[12px] text-qz-text-muted">创建一个目标后，任务会同步出现在首页和学习空间。</p>
+            </div>
+            <button type="button" onClick={handleCreateGoal} className="qz-btn-primary h-9 px-4 text-[12px]">
+              新建目标
+            </button>
+          </div>
+        ) : (
         <div className="grid md:grid-cols-3 gap-6">
           {data.goals.map((goal) => {
             const isSelected = selectedGoalId === goal.id;
@@ -267,6 +290,7 @@ export default function Goals() {
             );
           })}
         </div>
+        )}
 
         {/* Selected Goal Workspace */}
         {selectedGoal && (
@@ -472,4 +496,3 @@ export default function Goals() {
     </div>
   );
 }
-

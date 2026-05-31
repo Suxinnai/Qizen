@@ -37,3 +37,4 @@ app/src-tauri/WixTools/
 .alma/
 .omx/
 .claude/
+app/.visual-smoke/

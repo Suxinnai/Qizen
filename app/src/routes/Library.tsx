@@ -48,7 +48,7 @@ function parserStatusLabel(status: "parsed" | "partial" | "unsupported") {
   return "暂不支持深度解析";
 }
 
-function PracticeItem({ item }: { item: PracticeSet }) {
+function PracticeItem({ item, onStart }: { item: PracticeSet; onStart: () => void }) {
   const difficultyStyle = (diff: string) => {
     switch (diff) {
       case "基础":
@@ -62,7 +62,11 @@ function PracticeItem({ item }: { item: PracticeSet }) {
   };
 
   return (
-    <div className="rounded-qz border border-[#EFEDE8]/80 dark:border-zinc-800/40 bg-white dark:bg-qz-card-dark px-4 py-4 flex items-center justify-between gap-4 group hover:shadow-md transition-all duration-300">
+    <button
+      type="button"
+      onClick={onStart}
+      className="w-full text-left rounded-qz border border-[#EFEDE8]/80 dark:border-zinc-800/40 bg-white dark:bg-qz-card-dark px-4 py-4 flex items-center justify-between gap-4 group hover:shadow-md transition-all duration-300 cursor-pointer"
+    >
       <div className="flex items-start gap-3.5 min-w-0">
         <div className="w-8 h-8 rounded-lg bg-qz-primary/10 text-qz-primary flex items-center justify-center shrink-0">
           <ClipboardList size={15} />
@@ -82,7 +86,7 @@ function PracticeItem({ item }: { item: PracticeSet }) {
         <span>可开始</span>
         <ChevronRight size={12} />
       </span>
-    </div>
+    </button>
   );
 }
 
@@ -258,7 +262,7 @@ export default function Library() {
           <div className="hidden sm:block w-px h-4 bg-qz-divider dark:bg-qz-divider-dark" />
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-blue-500" />
-            <span className="text-qz-text-muted font-medium">AI 生成练习：</span>
+            <span className="text-qz-text-muted font-medium">可用练习：</span>
             <span className="font-bold text-qz-text-strong dark:text-qz-text-dark">{data.practiceSets.length} 套</span>
           </div>
           <div className="hidden sm:block w-px h-4 bg-qz-divider dark:bg-qz-divider-dark" />
@@ -588,14 +592,26 @@ export default function Library() {
                       <div className="space-y-4">
                         {practiceItems.length > 0 ? (
                           practiceItems.map((item) => (
-                            <PracticeItem key={item.id} item={item} />
+                            <PracticeItem
+                              key={item.id}
+                              item={item}
+                              onStart={() =>
+                                navigate("/study", {
+                                  state: {
+                                    source: "library",
+                                    resourceId: item.resourceId ?? selected?.id,
+                                    nodeId: linkedNodes[0]?.id,
+                                  },
+                                })
+                              }
+                            />
                           ))
                         ) : (
                           <div className="rounded-qz border border-dashed border-qz-divider dark:border-qz-divider-dark py-12 px-4 text-center">
                             <ClipboardList size={28} className="mx-auto text-qz-text-muted opacity-40 mb-3" />
                             <h5 className="text-[14px] font-bold text-qz-text-strong dark:text-qz-text-dark mb-1">针对此资料暂无专项练习</h5>
                             <p className="text-[12px] text-qz-text-muted max-w-sm mx-auto leading-relaxed">
-                              您可以点击右上角的「去学习空间」带着本份资料开启会话，系统将在对话交互中为您量量身定制练习题。
+                              您可以点击右上角的「去学习空间」带着本份资料开启会话，再基于命中资料生成练习题。
                             </p>
                           </div>
                         )}

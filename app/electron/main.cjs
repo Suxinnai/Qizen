@@ -4,8 +4,43 @@ const { app, BrowserWindow, ipcMain, shell } = require("electron");
 
 const DEV_URL = process.env.QIZEN_ELECTRON_DEV_URL;
 const isSmokeTest = process.argv.includes("--smoke-test");
+const isVisualSmoke = process.argv.includes("--visual-smoke");
+const visualSmokeUrl = process.env.QIZEN_VISUAL_SMOKE_URL;
+const visualSmokeOut = process.env.QIZEN_VISUAL_SMOKE_OUT;
+let visualSmokeRequired = [];
+try {
+  visualSmokeRequired = JSON.parse(process.env.QIZEN_VISUAL_SMOKE_REQUIRED || "[]");
+} catch {
+  visualSmokeRequired = [];
+}
 
 let mainWindow = null;
+
+if (isVisualSmoke) {
+  const visualSmokeProfile = process.env.QIZEN_VISUAL_SMOKE_PROFILE;
+  const visualSmokeCache = process.env.QIZEN_VISUAL_SMOKE_CACHE;
+  if (visualSmokeProfile) {
+    fs.mkdirSync(visualSmokeProfile, { recursive: true });
+    app.setPath("userData", visualSmokeProfile);
+  }
+  if (visualSmokeCache) fs.mkdirSync(visualSmokeCache, { recursive: true });
+  app.disableHardwareAcceleration();
+  app.commandLine.appendSwitch("disable-gpu");
+  app.commandLine.appendSwitch("disable-gpu-sandbox");
+  app.commandLine.appendSwitch("no-sandbox");
+  app.commandLine.appendSwitch("disable-dev-shm-usage");
+  app.commandLine.appendSwitch("disable-software-rasterizer");
+  app.commandLine.appendSwitch("disable-gpu-compositing");
+  app.commandLine.appendSwitch("disable-http-cache");
+  app.commandLine.appendSwitch("disk-cache-size", "1");
+  app.commandLine.appendSwitch("media-cache-size", "1");
+  if (visualSmokeCache) app.commandLine.appendSwitch("disk-cache-dir", visualSmokeCache);
+  if (visualSmokeProfile) app.commandLine.appendSwitch("user-data-dir", visualSmokeProfile);
+  app.commandLine.appendSwitch(
+    "disable-features",
+    "VizDisplayCompositor,UseSkiaRenderer,CanvasOopRasterization,DefaultANGLEVulkan,Vulkan,UseDawn,SkiaGraphite"
+  );
+}
 
 function safeSecretKey(key) {
   const safe = String(key)
@@ -91,6 +126,47 @@ function createWindow() {
   }
 }
 
+async function runVisualSmoke() {
+  if (!visualSmokeUrl || !visualSmokeOut) {
+    throw new Error("Missing visual smoke URL or output path");
+  }
+
+  const smokeWindow = new BrowserWindow({
+    width: 1440,
+    height: 960,
+    show: false,
+    backgroundColor: "#f3f3f3",
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
+  });
+
+  const timeout = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error("Visual smoke timed out while rendering /study")), 20000);
+  });
+  const render = (async () => {
+    smokeWindow.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedUrl) => {
+      console.error(`Visual smoke load failed: ${errorCode} ${errorDescription} ${validatedUrl}`);
+    });
+    await smokeWindow.loadURL(visualSmokeUrl);
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    return smokeWindow.webContents.executeJavaScript("document.body.innerText", true);
+  })();
+
+  const text = await Promise.race([render, timeout]);
+  const missing = visualSmokeRequired.filter((item) => !text.includes(item));
+  if (missing.length > 0) {
+    throw new Error(`Visual smoke missing text: ${missing.join(", ")}`);
+  }
+
+  const image = await smokeWindow.webContents.capturePage();
+  fs.mkdirSync(path.dirname(visualSmokeOut), { recursive: true });
+  fs.writeFileSync(visualSmokeOut, image.toPNG());
+  smokeWindow.destroy();
+}
+
 registerIpc();
 
 app.whenReady().then(() => {
@@ -99,6 +175,19 @@ app.whenReady().then(() => {
       throw new Error("Missing Electron preload script");
     }
     app.quit();
+    return;
+  }
+
+  if (isVisualSmoke) {
+    runVisualSmoke()
+      .then(() => {
+        console.log(`Visual smoke passed: ${visualSmokeOut}`);
+        app.quit();
+      })
+      .catch((error) => {
+        console.error(error);
+        app.exit(1);
+      });
     return;
   }
 

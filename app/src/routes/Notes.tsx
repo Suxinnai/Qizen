@@ -1,8 +1,9 @@
 import { motion } from "framer-motion";
 import { useMemo, useState } from "react";
 import { 
-  Copy, 
+  Copy,
   Download, 
+  Plus,
   Lightbulb,
   BookOpen, 
   Edit2, 
@@ -16,7 +17,7 @@ import {
   Clock
 } from "lucide-react";
 import clsx from "clsx";
-import { loadAppData, updateNote } from "../lib/storage";
+import { addNote, loadAppData, updateNote } from "../lib/storage";
 
 // A beautiful lightweight Markdown Renderer
 function MarkdownRenderer({ content }: { content: string }) {
@@ -102,6 +103,15 @@ export default function Notes() {
 
   const selected = notes.find((note) => note.id === selectedId) ?? notes[0];
 
+  function handleCreateNote() {
+    const title = window.prompt("请输入笔记标题");
+    if (!title?.trim()) return;
+    const next = addNote({ title });
+    setNotes(next.notes);
+    setSelectedId(next.notes[0]?.id ?? "");
+    setIsEditing(true);
+  }
+
   function handleContentChange(content: string) {
     if (!selected) return;
     const next = notes.map((note) =>
@@ -178,7 +188,17 @@ export default function Notes() {
             isLeftCollapsed ? "w-0 p-0 overflow-hidden opacity-0 border-r-0" : "w-[210px] p-5 opacity-100"
           )}
         >
-          <div className="font-serif text-[24px] text-qz-primary dark:text-qz-light font-bold mb-5 tracking-wide">笔记</div>
+          <div className="flex items-center justify-between gap-3 mb-5">
+            <div className="font-serif text-[24px] text-qz-primary dark:text-qz-light font-bold tracking-wide">笔记</div>
+            <button
+              type="button"
+              onClick={handleCreateNote}
+              className="w-8 h-8 rounded-xl border border-qz-primary/20 bg-qz-primary/10 text-qz-primary flex items-center justify-center"
+              title="新建笔记"
+            >
+              <Plus size={14} />
+            </button>
+          </div>
           <div className="space-y-2">
             {notes.map((note) => {
               const active = selectedId === note.id;
@@ -472,8 +492,11 @@ export default function Notes() {
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-center text-qz-text-muted p-8 select-none">
               <BookOpen size={30} className="mb-3 text-qz-light opacity-80" />
-              <div className="font-serif text-[18px] text-qz-primary mb-2">选择一篇笔记查看</div>
-              <p className="text-[12px] max-w-sm leading-relaxed">请在左侧目录选择任意手抄或AI笔记，右侧将立即为您呈实时渲染阅读工作台。</p>
+              <div className="font-serif text-[18px] text-qz-primary mb-2">还没有笔记</div>
+              <p className="text-[12px] max-w-sm leading-relaxed mb-4">新建一篇笔记，或在学习空间开启自动写入笔记。</p>
+              <button type="button" onClick={handleCreateNote} className="qz-btn-primary h-9 px-4 text-[12px]">
+                新建笔记
+              </button>
             </div>
           )}
         </main>
@@ -494,6 +517,7 @@ export default function Notes() {
                   <Lightbulb size={15} />
                   <span className="font-serif text-[17px] font-bold">重点提取</span>
                 </div>
+                {selected.aiKeyPoints.length > 0 ? (
                 <ul className="space-y-3 text-[12.5px] leading-relaxed text-qz-text dark:text-qz-text-dark font-medium">
                   {selected.aiKeyPoints.map((item) => (
                     <li key={item} className="flex items-start gap-2.5 pl-0.5 relative group/item py-0.5">
@@ -515,6 +539,9 @@ export default function Notes() {
                     </li>
                   ))}
                 </ul>
+                ) : (
+                  <div className="text-[12px] text-qz-text-muted leading-6">暂无自动提取重点。继续编辑或从学习空间写入后，这里会显示真实要点。</div>
+                )}
               </div>
               
               {/* Card 2: Confusing points */}
@@ -523,6 +550,7 @@ export default function Notes() {
                   <AlertCircle size={15} />
                   <span className="font-serif text-[17px] font-bold">易混淆点</span>
                 </div>
+                {selected.confusingPoints.length > 0 ? (
                 <ul className="space-y-3 text-[12.5px] leading-relaxed text-[#D97706] dark:text-[#FBBF24] font-medium font-sans">
                   {selected.confusingPoints.map((item) => (
                     <li key={item} className="flex items-start gap-2.5 pl-0.5 relative group/item py-0.5">
@@ -544,6 +572,9 @@ export default function Notes() {
                     </li>
                   ))}
                 </ul>
+                ) : (
+                  <div className="text-[12px] text-qz-text-muted leading-6">暂无易混淆点记录。</div>
+                )}
               </div>
 
             </div>

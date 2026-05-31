@@ -1,8 +1,8 @@
-import { useMemo } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { BarChart3, BookOpen, CheckCircle2, Clock, Database, MessageSquareText, Settings, Sparkles, UserRound } from "lucide-react";
+import { BarChart3, BookOpen, CheckCircle2, Clock, MessageSquareText, Settings, Sparkles, UserRound, Edit2 } from "lucide-react";
 
-import { getStudyInteractionCount, loadAppData, modeLabel, resetOnboarding, type LearningScores } from "../lib/storage";
+import { getStudyInteractionCount, loadAppData, modeLabel, resetOnboarding, updateSettings, type LearningScores } from "../lib/storage";
 
 /** 纯 CSS 雷达图：4 个轴 visual / auditory / reading / kinesthetic */
 function LearningRadar({ scores }: { scores: LearningScores }) {
@@ -123,7 +123,27 @@ function LearningRadar({ scores }: { scores: LearningScores }) {
 
 export default function Profile() {
   const navigate = useNavigate();
-  const data = useMemo(() => loadAppData(), []);
+  const [data, setData] = useState(() => loadAppData());
+
+  useEffect(() => {
+    const handleSync = () => setData(loadAppData());
+    window.addEventListener("qizen-appdata-change", handleSync);
+    return () => window.removeEventListener("qizen-appdata-change", handleSync);
+  }, []);
+
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [newName, setNewName] = useState(() => data.settings.username ?? "");
+
+  const username = data.settings.username?.trim() || "学习者";
+  const avatarChar = username.charAt(0);
+
+  function saveNickname() {
+    setIsEditingName(false);
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    updateSettings({ username: trimmed });
+  }
+
   const profile = data.learningProfile;
   const interactionCount = getStudyInteractionCount(data);
   const allTasks = data.goals.flatMap((goal) => goal.milestones.flatMap((milestone) => milestone.tasks));
@@ -159,11 +179,34 @@ export default function Profile() {
 
         <div className="qz-card grid md:grid-cols-[240px,1fr] gap-6 items-center">
           <div className="flex flex-col items-center text-center">
-            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-qz-light to-qz-primary text-white flex items-center justify-center text-[34px] font-serif shadow-qz-card">
-              沐
+            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-qz-light to-qz-primary text-white flex items-center justify-center text-[34px] font-serif shadow-qz-card select-none">
+              {avatarChar}
             </div>
-            <div className="mt-4 font-serif text-[26px] text-qz-text-strong dark:text-qz-text-dark">沐灵</div>
-            <div className="mt-1 text-[12px] text-qz-mastered">在线 · 栖知学习者</div>
+            
+            {isEditingName ? (
+              <div className="mt-4 flex items-center gap-2">
+                <input
+                  type="text"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  className="rounded-lg border border-qz-primary/30 bg-transparent px-3 py-1 text-[16px] text-center font-serif outline-none w-36"
+                  autoFocus
+                  onBlur={saveNickname}
+                  onKeyDown={(e) => e.key === "Enter" && saveNickname()}
+                />
+              </div>
+            ) : (
+              <div
+                onClick={() => setIsEditingName(true)}
+                className="mt-4 font-serif text-[26px] text-qz-text-strong dark:text-qz-text-dark cursor-pointer hover:text-qz-primary transition-colors flex items-center gap-1.5 justify-center group"
+                title="点击编辑昵称"
+              >
+                <span>{username}</span>
+                <Edit2 size={13} className="opacity-0 group-hover:opacity-100 text-qz-text-muted transition-all" />
+              </div>
+            )}
+
+            <div className="mt-1 text-[12px] text-qz-mastered">本地学习档案</div>
           </div>
 
           <div className="grid md:grid-cols-3 gap-4">
@@ -306,10 +349,6 @@ export default function Profile() {
                 <Settings size={16} className="text-qz-primary" />
                 <span className="text-[13px]">调整学习偏好</span>
               </Link>
-              <div className="flex items-center gap-3 rounded-[14px] border border-dashed border-black/[0.08] dark:border-white/[0.1] px-4 py-3 text-qz-text-muted">
-                <Database size={16} />
-                <span className="text-[13px]">数据管理入口规划中</span>
-              </div>
             </div>
           </div>
         </div>

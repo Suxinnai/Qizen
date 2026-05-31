@@ -1,8 +1,7 @@
-import { useState } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type { LibraryRagResult } from "../../lib/rag";
 import { getStrongRag, scoreLabel, shouldDisplayRagEvidence } from "../../lib/study/rag-policy";
-import { splitStudyParagraphs } from "../../lib/study/sanitize";
 
 function MessageCitations({ rag }: { rag: LibraryRagResult }) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -87,15 +86,144 @@ function MessageCitations({ rag }: { rag: LibraryRagResult }) {
   );
 }
 
+function renderInline(text: string) {
+  const parts: ReactNode[] = [];
+  const regex = /(`[^`]+`|\*\*[^*]+\*\*|\[[^\]]+\]\([^)]+\))/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
+    const token = match[0];
+    if (token.startsWith("`")) {
+      parts.push(<code key={`${match.index}-code`}>{token.slice(1, -1)}</code>);
+    } else if (token.startsWith("**")) {
+      parts.push(<strong key={`${match.index}-strong`}>{token.slice(2, -2)}</strong>);
+    } else {
+      const link = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+      parts.push(
+        <a key={`${match.index}-link`} href={link?.[2] ?? "#"} target="_blank" rel="noreferrer">
+          {link?.[1] ?? token}
+        </a>
+      );
+    }
+    lastIndex = match.index + token.length;
+  }
+
+  if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+  return parts.map((part, index) => <Fragment key={index}>{part}</Fragment>);
+}
+
+function renderMarkdownBlocks(content: string) {
+  const lines = content.replace(/\r/g, "").split("\n");
+  const blocks: ReactNode[] = [];
+  let index = 0;
+
+  while (index < lines.length) {
+    const line = lines[index];
+    if (!line.trim()) {
+      index += 1;
+      continue;
+    }
+
+    if (line.startsWith("```")) {
+      const lang = line.replace(/^```/, "").trim();
+      const codeLines: string[] = [];
+      index += 1;
+      while (index < lines.length && !lines[index].startsWith("```")) {
+        codeLines.push(lines[index]);
+        index += 1;
+      }
+      index += 1;
+      blocks.push(
+        <pre key={`code-${index}`}>
+          {lang ? <span className="qz-md-code-lang">{lang}</span> : null}
+          <code>{codeLines.join("\n")}</code>
+        </pre>
+      );
+      continue;
+    }
+
+    const heading = line.match(/^(#{2,4})\s+(.+)$/);
+    if (heading) {
+      const Tag = (`h${heading[1].length}` as "h2" | "h3" | "h4");
+      blocks.push(<Tag key={`heading-${index}`}>{renderInline(heading[2])}</Tag>);
+      index += 1;
+      continue;
+    }
+
+    if (/^>\s?/.test(line)) {
+      const quoteLines: string[] = [];
+      while (index < lines.length && /^>\s?/.test(lines[index])) {
+        quoteLines.push(lines[index].replace(/^>\s?/, ""));
+        index += 1;
+      }
+      blocks.push(
+        <blockquote key={`quote-${index}`}>
+          {quoteLines.map((quote, quoteIndex) => (
+            <p key={quoteIndex}>{renderInline(quote)}</p>
+          ))}
+        </blockquote>
+      );
+      continue;
+    }
+
+    if (/^\s*[-*]\s+/.test(line)) {
+      const items: string[] = [];
+      while (index < lines.length && /^\s*[-*]\s+/.test(lines[index])) {
+        items.push(lines[index].replace(/^\s*[-*]\s+/, ""));
+        index += 1;
+      }
+      blocks.push(
+        <ul key={`ul-${index}`}>
+          {items.map((item, itemIndex) => (
+            <li key={itemIndex}>{renderInline(item)}</li>
+          ))}
+        </ul>
+      );
+      continue;
+    }
+
+    if (/^\s*\d+\.\s+/.test(line)) {
+      const items: string[] = [];
+      while (index < lines.length && /^\s*\d+\.\s+/.test(lines[index])) {
+        items.push(lines[index].replace(/^\s*\d+\.\s+/, ""));
+        index += 1;
+      }
+      blocks.push(
+        <ol key={`ol-${index}`}>
+          {items.map((item, itemIndex) => (
+            <li key={itemIndex}>{renderInline(item)}</li>
+          ))}
+        </ol>
+      );
+      continue;
+    }
+
+    const paragraphLines = [line.trim()];
+    index += 1;
+    while (
+      index < lines.length &&
+      lines[index].trim() &&
+      !/^(#{2,4})\s+/.test(lines[index]) &&
+      !/^>\s?/.test(lines[index]) &&
+      !/^\s*[-*]\s+/.test(lines[index]) &&
+      !/^\s*\d+\.\s+/.test(lines[index]) &&
+      !lines[index].startsWith("```")
+    ) {
+      paragraphLines.push(lines[index].trim());
+      index += 1;
+    }
+    blocks.push(<p key={`p-${index}`}>{renderInline(paragraphLines.join(" "))}</p>);
+  }
+
+  return blocks;
+}
+
 export function MessageBody({ content, rag }: { content: string; rag?: LibraryRagResult }) {
-  const paragraphs = splitStudyParagraphs(content);
   return (
-    <div className="space-y-3">
-      {paragraphs.map((paragraph, index) => (
-        <p key={`${index}-${paragraph.slice(0, 8)}`} className="leading-[1.85]">
-          {paragraph}
-        </p>
-      ))}
+    <div className="qz-md">
+      {renderMarkdownBlocks(content)}
       {rag ? <MessageCitations rag={rag} /> : null}
     </div>
   );

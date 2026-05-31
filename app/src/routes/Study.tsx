@@ -54,6 +54,17 @@ export default function Study() {
   }:${routeContext?.nodeId ?? ""}:${routeContext?.taskId ?? ""}:${routeContext?.noteId ?? ""}`;
 
   const session = useStudySession(routeContext, routeContextKey);
+  const journeySteps = [
+    { key: "define", label: "内容" },
+    { key: "discuss", label: "方式" },
+    { key: "plan", label: "计划" },
+    { key: "research", label: "资料" },
+    { key: "learn", label: "学习" },
+  ] as const;
+  const activeJourneyIndex = Math.max(
+    0,
+    journeySteps.findIndex((step) => step.key === session.journeyStage)
+  );
 
   // Inner Chat Sessions Sidebar States
   const [sessions, setSessions] = useState<PersistedStudyConversation[]>(() =>
@@ -213,8 +224,32 @@ export default function Study() {
             }}
           >
             <div className="qz-study-content">
-              {session.messages.length === 0 ? <StudyEmptyState /> : null}
-              <MessageList messages={session.messages} onUnderstood={session.handleUnderstood} />
+              <div className="qz-journey-bar select-none">
+                {journeySteps.map((step, index) => (
+                  <div
+                    key={step.key}
+                    className={clsx(
+                      "qz-journey-step",
+                      index < activeJourneyIndex && "qz-journey-step-done",
+                      index === activeJourneyIndex && "qz-journey-step-active"
+                    )}
+                  >
+                    <span>{index + 1}</span>
+                    <strong>{step.label}</strong>
+                  </div>
+                ))}
+              </div>
+              {session.messages.length === 0 ? (
+                <StudyEmptyState onSendPrompt={session.sendMessage} />
+              ) : null}
+              <MessageList
+                messages={session.messages}
+                isGenerating={session.isGeneratingAnswer}
+                onUnderstood={session.handleUnderstood}
+                onSendPrompt={session.sendMessage}
+                onSaveNote={session.saveMessageToNote}
+                onConfirmPlan={(steps) => void session.confirmPlanAndResearch(steps)}
+              />
             </div>
           </div>
 
@@ -260,10 +295,12 @@ export default function Study() {
                 <ResourcePanel
                   selectedResource={session.selectedResource}
                   latestRag={session.latestRag}
+                  resourceLeads={session.resourceLeads}
                   practiceSet={session.practiceSet}
                   practiceHint={session.practiceHint}
                   onGeneratePractice={session.generatePracticeFromLatestRag}
                   onCompletePractice={session.completeCurrentPracticeSet}
+                  onSelectResource={session.selectResource}
                 />
               );
             }
@@ -272,7 +309,14 @@ export default function Study() {
                 <NotePanel value={session.noteDraft} onChange={session.handleNoteDraftChange} />
               );
             }
-            return <GraphPanel selectedNode={session.selectedNode} />;
+            return (
+              <GraphPanel
+                selectedNode={session.selectedNode}
+                selectedTask={session.selectedTask}
+                journeyStage={session.journeyStage}
+                onSelectNode={session.selectNode}
+              />
+            );
           }}
         />
       </div>

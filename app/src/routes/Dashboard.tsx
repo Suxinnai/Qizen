@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { BarChart3, CheckCircle2, Circle, Clock, Flame, MessageSquareText, Sparkles, Target } from "lucide-react";
 import { motion } from "framer-motion";
@@ -32,7 +32,7 @@ function GreetingCard({ data }: { data: AppData }) {
     >
       <div className="qz-noise absolute inset-0 opacity-40 pointer-events-none" />
       <div className="relative z-10">
-        <h1 className="font-serif text-[28px] leading-tight">早上好，沐灵</h1>
+        <h1 className="font-serif text-[28px] leading-tight">早上好，{data.settings.username?.trim() || "学习者"}</h1>
         <p className="mt-2 text-[13px] opacity-90">
           连续学习 {streak} 天 · 今天还有 {getTodayTasks(data).filter((t) => !t.done).length} 个任务
         </p>
@@ -149,6 +149,7 @@ function TodayTasksCard({ data, refresh }: { data: AppData; refresh: () => void 
         <h2 className="font-serif text-[18px] text-qz-text-strong dark:text-qz-text-dark">今日任务</h2>
         <span className="text-[12px] text-qz-text-muted">剩 {remaining} 项</span>
       </div>
+      {tasks.length > 0 ? (
       <ul className="flex flex-col gap-2">
         {tasks.map((task) => (
           <li
@@ -180,6 +181,9 @@ function TodayTasksCard({ data, refresh }: { data: AppData; refresh: () => void 
           </li>
         ))}
       </ul>
+      ) : (
+        <div className="text-[13px] text-qz-text-muted text-center py-4">暂无任务。创建目标后会出现在这里。</div>
+      )}
     </div>
   );
 }
@@ -227,7 +231,7 @@ function PendingReviewCard({ data }: { data: AppData }) {
               </div>
               <button
                 type="button"
-                onClick={() => navigate("/study")}
+                onClick={() => navigate("/study", { state: { source: "goal", taskId: task.id } })}
                 className="qz-btn-primary px-3.5 py-1.5 text-[12px] shrink-0"
               >
                 去学习
@@ -236,7 +240,9 @@ function PendingReviewCard({ data }: { data: AppData }) {
           ))}
         </div>
       ) : (
-        <div className="text-[13px] text-qz-text-muted text-center py-4">所有任务已完成，继续保持！</div>
+        <div className="text-[13px] text-qz-text-muted text-center py-4">
+          {data.goals.length === 0 ? "暂无待复习任务。" : "所有任务已完成，继续保持！"}
+        </div>
       )}
     </div>
   );
@@ -244,7 +250,7 @@ function PendingReviewCard({ data }: { data: AppData }) {
 
 function RhythmCard({ data }: { data: AppData }) {
   const heights = useMemo(() => data.studyStats.dailyMinutes, [data.studyStats.dailyMinutes]);
-  const max = Math.max(...heights);
+  const max = Math.max(...heights, 1);
 
   return (
     <div className="qz-card">
@@ -309,6 +315,12 @@ function ReportsEntryCard() {
 export default function Dashboard() {
   const [data, setData] = useState<AppData>(() => loadAppData());
   const refresh = () => setData(loadAppData());
+
+  useEffect(() => {
+    const handleSync = () => setData(loadAppData());
+    window.addEventListener("qizen-appdata-change", handleSync);
+    return () => window.removeEventListener("qizen-appdata-change", handleSync);
+  }, []);
 
   return (
     <div className="relative h-full overflow-y-auto">

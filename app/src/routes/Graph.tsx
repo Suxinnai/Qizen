@@ -189,6 +189,17 @@ export default function Graph() {
         </div>
 
         <div className="flex-1 min-h-0 grid grid-cols-[1fr,340px] gap-6">
+          {nodes.length === 0 ? (
+            <div className="lg:col-span-2 rounded-[24px] border border-dashed border-black/5 dark:border-white/5 bg-white/60 dark:bg-black/10 min-h-[420px] flex flex-col items-center justify-center text-center p-8">
+              <Network size={34} className="text-qz-primary mb-4" />
+              <div className="font-serif text-[24px] text-qz-text-strong dark:text-qz-text-dark">暂无知识节点</div>
+              <p className="mt-2 text-[12px] text-qz-text-muted max-w-md leading-6">上传并解析资料后，资料中的关键概念会生成到知识图谱。</p>
+              <button type="button" onClick={() => navigate("/library")} className="qz-btn-primary mt-5 h-9 px-4 text-[12px]">
+                去上传资料
+              </button>
+            </div>
+          ) : (
+          <>
           <div className="rounded-[24px] border border-black/5 dark:border-white/5 bg-white/60 dark:bg-black/10 overflow-hidden min-h-0 flex flex-col">
             <div className="px-5 py-4 border-b border-black/5 dark:border-white/5 flex items-center justify-between">
               <div className="flex items-center gap-2 text-qz-primary">
@@ -516,6 +527,8 @@ export default function Graph() {
               )}
             </div>
           </div>
+          </>
+          )}
         </div>
       </div>
     </div>

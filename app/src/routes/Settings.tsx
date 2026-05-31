@@ -7,8 +7,11 @@ import {
   loadAppData,
   updateSettings,
   resetOnboarding,
+  exportAppData,
+  resetAppData,
   type LlmProviderType,
 } from "../lib/storage";
+import { clearStudyConversations } from "../lib/studyConversations";
 
 type ConnectionStatus =
   | { kind: "idle" }
@@ -16,13 +19,11 @@ type ConnectionStatus =
   | { kind: "success"; message: string }
   | { kind: "error"; message: string };
 
-function StatusBadge({ status }: { status: "已接入" | "规划中" | "本地保存" }) {
+function StatusBadge({ status }: { status: "已接入" | "本地保存" }) {
   const cls =
     status === "已接入"
       ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-      : status === "本地保存"
-      ? "bg-amber-500/10 text-amber-700 dark:text-amber-300"
-      : "bg-black/[0.04] dark:bg-white/[0.06] text-qz-text-muted";
+      : "bg-amber-500/10 text-amber-700 dark:text-amber-300";
   return <span className={`text-[10px] px-2 py-1 rounded-full ${cls}`}>{status}</span>;
 }
 
@@ -37,7 +38,7 @@ function ToggleRow({
   desc?: string;
   checked: boolean;
   onChange: (value: boolean) => void;
-  status?: "已接入" | "规划中" | "本地保存";
+  status?: "已接入" | "本地保存";
 }) {
   return (
     <label className="flex items-center justify-between gap-4 rounded-[14px] border border-black/[0.05] dark:border-white/[0.08] px-4 py-3">
@@ -53,7 +54,7 @@ function ToggleRow({
   );
 }
 
-function ValueRow({ label, value, status }: { label: string; value: string; status?: "已接入" | "规划中" | "本地保存" }) {
+function ValueRow({ label, value, status }: { label: string; value: string; status?: "已接入" | "本地保存" }) {
   return (
     <div className="flex items-center justify-between gap-4 rounded-[14px] border border-black/[0.05] dark:border-white/[0.08] px-4 py-3">
       <span className="flex items-center gap-2 text-[14px] text-qz-text-strong dark:text-qz-text-dark">
@@ -73,6 +74,15 @@ export default function Settings() {
   const [hasSavedApiKey, setHasSavedApiKey] = useState(Boolean(initial.settings.llm.apiKey));
   const [studyInteractionCount] = useState(getStudyInteractionCount(initial));
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>({ kind: "idle" });
+
+  useEffect(() => {
+    const handleSync = () => {
+      const latest = loadAppData();
+      setSettings(latest.settings);
+    };
+    window.addEventListener("qizen-appdata-change", handleSync);
+    return () => window.removeEventListener("qizen-appdata-change", handleSync);
+  }, []);
 
   function handleReOnboard() {
     if (confirm("确定要重新进行学习画像评测吗？这将重置当前的四维分布分值并开始重新测试。")) {
@@ -132,6 +142,32 @@ export default function Settings() {
     setSettings((prev) => ({ ...prev, llm: { ...prev.llm, apiKey: "" } }));
   }
 
+  function handleExportData() {
+    const blob = new Blob([exportAppData()], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `qizen-data-${new Date().toISOString().slice(0, 10)}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleClearConversations() {
+    if (!confirm("确定要清理学习会话历史吗？目标、资料、笔记和设置不会被删除。")) return;
+    clearStudyConversations();
+    setConnectionStatus({ kind: "success", message: "会话历史已清理" });
+  }
+
+  function handleResetData() {
+    if (!confirm("确定要重置全部本地数据吗？这会清空目标、资料、笔记、报告和会话历史。")) return;
+    clearStudyConversations();
+    const next = resetAppData();
+    setSettings(next.settings);
+    setApiKeyDraft("");
+    setHasSavedApiKey(false);
+    setConnectionStatus({ kind: "success", message: "本地数据已重置" });
+  }
+
   return (
     <div className="h-full overflow-y-auto">
       <div className="p-8 max-w-[1120px] mx-auto flex flex-col gap-6">
@@ -147,6 +183,21 @@ export default function Settings() {
           </div>
 
           <div className="space-y-4">
+            <div>
+              <div className="font-serif text-[20px] text-qz-text-strong dark:text-qz-text-dark mb-3">基本信息</div>
+              <div className="space-y-3">
+                <label className="block rounded-[14px] border border-black/[0.05] dark:border-white/[0.08] px-4 py-3">
+                  <div className="text-[13px] mb-2 font-medium">用户昵称</div>
+                  <input
+                    value={settings.username ?? ""}
+                    onChange={(e) => patch("username", e.target.value)}
+                    className="w-full rounded-[10px] border border-black/[0.08] dark:border-white/[0.1] bg-transparent px-3 py-2 text-[13px] outline-none"
+                    placeholder="输入您的昵称"
+                  />
+                </label>
+              </div>
+            </div>
+
             <div>
               <div className="font-serif text-[20px] text-qz-text-strong dark:text-qz-text-dark mb-3">模型与 API</div>
               <div className="space-y-3">
@@ -202,10 +253,6 @@ export default function Settings() {
                   </div>
                 </label>
 
-                <ValueRow label="Agent / 后台任务模型" value="claude-haiku-4（规划值）" status="规划中" />
-                <ValueRow label="标题生成模型" value="与 Agent 模型相同" status="规划中" />
-                <ValueRow label="网络搜索 API" value="Tavily（未配置）" status="规划中" />
-
                 <div className="flex items-center gap-3 flex-wrap pt-1">
                   <button
                     type="button"
@@ -228,7 +275,6 @@ export default function Settings() {
                 <ToggleRow label="AI 自动打开学习面板" checked={settings.autoOpenStudyPanels} onChange={(value) => patch("autoOpenStudyPanels", value)} />
                 <ToggleRow label="AI 自动写入笔记" checked={settings.autoAppendNote} onChange={(value) => patch("autoAppendNote", value)} />
                 <ToggleRow label="会话结束后生成标题" checked={settings.autoGenerateSessionTitle} onChange={(value) => patch("autoGenerateSessionTitle", value)} />
-                <ToggleRow label="会话结束后整理笔记" checked={settings.autoSummarizeSessionNote} onChange={(value) => patch("autoSummarizeSessionNote", value)} status="规划中" />
                 <label className="block rounded-[14px] border border-black/[0.05] dark:border-white/[0.08] px-4 py-3">
                   <div className="text-[14px] text-qz-text-strong dark:text-qz-text-dark mb-2">run_terminal 需用户确认</div>
                   <select
@@ -305,15 +351,23 @@ export default function Settings() {
                   </button>
                 </div>
 
-                <div className="rounded-[14px] border border-dashed border-rose-500/20 bg-rose-500/5 px-4 py-3">
-                  <div className="flex items-center justify-between gap-3">
+                <div className="rounded-[14px] border border-black/[0.05] dark:border-white/[0.08] px-4 py-3">
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
                     <div>
-                      <div className="text-[14px] text-rose-700 dark:text-rose-300">危险操作</div>
-                      <div className="text-[12px] text-qz-text-muted mt-1">清理会话历史、导出数据和重置本地数据将在数据管理页接入；这里先禁用，避免误触。</div>
+                      <div className="text-[14px] text-qz-text-strong dark:text-qz-text-dark">数据管理</div>
+                      <div className="text-[12px] text-qz-text-muted mt-1">导出、清理会话历史或重置本地数据。</div>
                     </div>
-                    <button type="button" disabled className="px-3 py-1.5 rounded-full bg-rose-500/10 text-rose-700 dark:text-rose-300 text-[11px] cursor-not-allowed">
-                      规划中
-                    </button>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button type="button" onClick={handleExportData} className="px-3 py-1.5 rounded-full bg-qz-primary/10 text-qz-primary text-[11px] font-bold">
+                        导出数据
+                      </button>
+                      <button type="button" onClick={handleClearConversations} className="px-3 py-1.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 text-[11px] font-bold">
+                        清理会话
+                      </button>
+                      <button type="button" onClick={handleResetData} className="px-3 py-1.5 rounded-full bg-rose-500/10 text-rose-700 dark:text-rose-300 text-[11px] font-bold">
+                        重置本地数据
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
