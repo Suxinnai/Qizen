@@ -11,6 +11,7 @@ import {
   addLearningPlanGoal,
   type TeachingStyle,
   type AppData,
+  type LlmProviderConfig,
 } from "../lib/storage";
 import {
   createPracticeSetFromRagResult,
@@ -752,6 +753,147 @@ export function useStudySession(routeContext: StudyLocationState | null, routeCo
     void refreshConversationTitle(nextMessages);
   }
 
+  // 学习 Agent：单步真实流式生成（无模型时降级本地），独立于 sendMessage。
+  async function streamOneAgentStep(
+    step: { label: string; query: string; thinking: string[] },
+    rag: LibraryRagResult,
+    providerConfig: LlmProviderConfig
+  ) {
+    const assistantId = `a-agent-step-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const hasHits = rag.results.length > 0;
+    const shell: ChatMessage = {
+      id: assistantId,
+      role: "assistant",
+      kind: "agent",
+      content: "",
+      streamState: "streaming",
+      thinking: step.thinking,
+      rag: hasHits ? rag : undefined,
+    };
+    setMessages((prev) => [...prev, shell]);
+
+    let rawAnswer = "";
+    const llmResult = await generateStudyAnswer({
+      query: step.query,
+      rag,
+      style: teachingStyle,
+      profileText,
+      selectedResourceTitle: selectedResource?.title,
+      selectedNodeLabel: selectedNode?.label,
+      providerConfig,
+      onToken: (delta) => {
+        rawAnswer += delta;
+        const display = sanitizeLlmText(rawAnswer);
+        setMessages((prev) => prev.map((item) => (item.id === assistantId ? { ...item, content: display } : item)));
+      },
+    });
+
+    const finalContent = sanitizeLlmText(
+      llmResult.usedFallback
+        ? `${buildAssistantReply({
+            query: step.query,
+            style: teachingStyle,
+            selectedResourceTitle: selectedResource?.title,
+            selectedNodeLabel: selectedNode?.label,
+            rag,
+          })}\n\n${
+            llmResult.errorSummary
+              ? `（已回退到本地回答：${llmResult.errorSummary}）`
+              : "（当前未使用真实模型，已回退到本地回答。）"
+          }`
+        : llmResult.answer
+    );
+
+    const finalMessage: ChatMessage = {
+      ...shell,
+      content: finalContent,
+      streamState: "done",
+      providerLabel: llmResult.providerLabel,
+      usedFallback: llmResult.usedFallback,
+      errorSummary: llmResult.errorSummary,
+    };
+    setMessages((prev) => prev.map((item) => (item.id === assistantId ? finalMessage : item)));
+
+    appendStudySessionEvent({
+      id: `study-event-${Date.now()}`,
+      type: "ask",
+      recordedAt: new Date().toISOString(),
+      question: step.query,
+      resourceId: selectedResource?.id ?? null,
+      nodeId: selectedNode?.id ?? null,
+      taskId: conversationContext?.taskId ?? null,
+      hitResourceTitles: collectHitResourceTitles(rag),
+      generatedPractice: false,
+      llm: {
+        usedRealModel: !llmResult.usedFallback,
+        providerLabel: llmResult.providerLabel,
+        usedFallback: llmResult.usedFallback,
+      },
+    });
+    setStudyInteractionCount((prev) => prev + 1);
+  }
+
+  async function runLearningAgent(topicOverride?: string) {
+    if (isGeneratingAnswer) return;
+    const topic = (topicOverride || currentTopic || learningGoal).trim() || "这个主题";
+    setIsGeneratingAnswer(true);
+    setJourneyStage("learn");
+
+    const providerConfig = await resolveLlmProviderConfig(data.settings.llm);
+    const rawRag = shouldSearchKnowledgeBase(topic)
+      ? retrieveRelevantLibraryContext(data, topic, {
+          resourceId: selectedResource?.id,
+          nodeId: selectedNode?.id,
+          topK: 3,
+          minScore: Math.max(1.5, data.settings.ragSimilarityThreshold * 3.5),
+        })
+      : createEmptyRag(topic);
+    const rag = getStrongRag(rawRag);
+    if (rag.results.length > 0) {
+      setLatestRag(rag);
+      setActivePanel("resource");
+    }
+
+    const intro: ChatMessage = {
+      id: `a-agent-intro-${Date.now()}`,
+      role: "assistant",
+      kind: "agent",
+      content: sanitizeLlmText(
+        `## 学习 Agent 开始带学：${topic}\n我会分三步带你过一轮：先讲核心概念，再用一个问题检查你的理解，最后小结要点并指出下一步。`
+      ),
+      thinking: ["规划学习步骤", "准备检索资料依据"],
+      triggers: rag.results.length > 0 ? ["resource"] : undefined,
+    };
+    setMessages((prev) => [...prev, intro]);
+
+    const steps: { label: string; query: string; thinking: string[] }[] = [
+      {
+        label: "讲解核心",
+        thinking: ["拆解核心概念", "结合资料组织讲解"],
+        query: `请讲解「${topic}」最核心的概念与直觉，先给结论再给依据，控制在关键要点内。`,
+      },
+      {
+        label: "检查理解",
+        thinking: ["设计一个检查理解的问题"],
+        query: `针对「${topic}」，提出一个能检验我是否真正理解的问题，并给出回答这个问题的思路提示，但不要直接给出完整答案。`,
+      },
+      {
+        label: "小结与下一步",
+        thinking: ["归纳要点", "给出下一步建议"],
+        query: `请用 3-5 条要点小结「${topic}」，并明确建议我下一步应该练习或深入哪个方向。`,
+      },
+    ];
+
+    try {
+      for (const step of steps) {
+        await streamOneAgentStep(step, rag, providerConfig);
+        await wait(350);
+      }
+    } finally {
+      setIsGeneratingAnswer(false);
+    }
+  }
+
   function generatePracticeFromLatestRag() {
     if (!latestRag || latestRag.results.length === 0) {
       setPracticeSet(null);
@@ -903,6 +1045,8 @@ export function useStudySession(routeContext: StudyLocationState | null, routeCo
     setPomodoroSeconds,
     sendMessage,
     confirmPlanAndResearch,
+    runLearningAgent,
+    canRunAgent: hasBoundStudyContext || messages.some((message) => message.role === "user"),
     handleUnderstood,
     saveMessageToNote,
     generatePracticeFromLatestRag,
