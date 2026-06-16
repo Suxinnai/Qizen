@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { BarChart3, BookOpen, CheckCircle2, Clock, MessageSquareText, Settings, Sparkles, UserRound, Edit2 } from "lucide-react";
+import { BarChart3, BookOpen, CheckCircle2, Clock, Flame, MessageSquareText, Settings, Sparkles, Target, UserRound, Edit2 } from "lucide-react";
 
 import { getStudyInteractionCount, loadAppData, modeLabel, resetOnboarding, updateSettings, type LearningScores } from "../lib/storage";
+import { deriveLearnerMemory } from "../lib/study/memory";
 
 /** 纯 CSS 雷达图：4 个轴 visual / auditory / reading / kinesthetic */
 function LearningRadar({ scores }: { scores: LearningScores }) {
@@ -154,6 +155,7 @@ export default function Profile() {
   const totalAsks = events.filter((e) => e.type === "ask").length;
   const totalPractices = data.practiceSets.length;
   const recentEvents = events.slice(-5).reverse();
+  const memory = deriveLearnerMemory(data);
 
   const typeLabel: Record<string, string> = {
     ask: "提问",
@@ -254,6 +256,79 @@ export default function Profile() {
               <BookOpen size={16} className="text-qz-learning" />
             </div>
             <div className="font-serif text-[32px] text-qz-learning">{data.libraryItems.length}</div>
+          </div>
+        </div>
+
+        {/* 学习记忆：从学习记录派生的长期信号 */}
+        <div className="qz-card">
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-2 text-qz-primary">
+              <Sparkles size={17} />
+              <h2 className="font-serif text-[22px]">学习记忆</h2>
+            </div>
+            <span className="text-[11px] text-qz-text-muted px-2.5 py-1 rounded-full bg-black/[0.03] dark:bg-white/[0.04]">
+              从 {memory.totalInteractions} 次学习交互中提炼
+            </span>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-4">
+            {/* 连续学习 */}
+            <div className="rounded-[18px] border border-black/[0.05] dark:border-white/[0.08] px-4 py-4">
+              <div className="flex items-center gap-2 mb-3 text-qz-text-muted">
+                <Flame size={15} className="text-amber-500" />
+                <span className="text-[12px] font-medium">连续学习</span>
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="font-serif text-[30px] text-qz-primary leading-none">{memory.streak.current}</span>
+                <span className="text-[12px] text-qz-text-muted">天</span>
+              </div>
+              <div className="mt-2 text-[11px] text-qz-text-muted">
+                最长 {memory.streak.longest} 天 · 累计活跃 {memory.totalActiveDays} 天
+              </div>
+            </div>
+
+            {/* 需巩固的点 */}
+            <div className="rounded-[18px] border border-black/[0.05] dark:border-white/[0.08] px-4 py-4">
+              <div className="flex items-center gap-2 mb-3 text-qz-text-muted">
+                <Target size={15} className="text-rose-500" />
+                <span className="text-[12px] font-medium">需巩固的点</span>
+              </div>
+              {memory.weakPoints.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {memory.weakPoints.map((point) => (
+                    <span
+                      key={point.key}
+                      title={`${point.kind === "resource" ? "资料" : "主题"} · 出现 ${point.occurrences} 次`}
+                      className="text-[11px] px-2 py-1 rounded-full bg-rose-500/8 text-rose-700 dark:text-rose-300 border border-rose-500/15"
+                    >
+                      {point.key}
+                      <span className="ml-1 opacity-60 font-mono">×{point.occurrences}</span>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-[12px] text-qz-text-muted leading-6">
+                  反复涉及的资料或主题会聚到这里。多围绕同一主题提问后即可显现。
+                </div>
+              )}
+            </div>
+
+            {/* 模型依赖 */}
+            <div className="rounded-[18px] border border-black/[0.05] dark:border-white/[0.08] px-4 py-4">
+              <div className="flex items-center gap-2 mb-3 text-qz-text-muted">
+                <Sparkles size={15} className="text-qz-primary" />
+                <span className="text-[12px] font-medium">真实模型占比</span>
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="font-serif text-[30px] text-qz-primary leading-none">
+                  {Math.round(memory.realModelRatio * 100)}
+                </span>
+                <span className="text-[12px] text-qz-text-muted">%</span>
+              </div>
+              <div className="mt-2 text-[11px] text-qz-text-muted truncate">
+                {memory.preferredProvider ? `主要来自 ${memory.preferredProvider}` : "尚未使用真实模型"}
+              </div>
+            </div>
           </div>
         </div>
 
