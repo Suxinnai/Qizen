@@ -98,9 +98,14 @@ export function PracticePanel({
             {practice.basedOnTitles.length > 1 ? `，并参考 ${practice.basedOnTitles.slice(1).join("、")}` : ""}
           </div>
         </div>
-        <span className="text-[10px] px-2 py-1 rounded-full bg-white/80 dark:bg-black/15 text-qz-text-muted">
-          {practice.questions.length} 题
-        </span>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="text-[10px] px-2 py-1 rounded-full bg-qz-primary/10 text-qz-primary font-bold">
+            {practice.difficulty}
+          </span>
+          <span className="text-[10px] px-2 py-1 rounded-full bg-white/80 dark:bg-black/15 text-qz-text-muted">
+            {practice.questions.length} 题
+          </span>
+        </div>
       </div>
 
       <div className="space-y-3">

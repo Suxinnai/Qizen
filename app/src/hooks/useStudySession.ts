@@ -22,6 +22,7 @@ import { isNonLearningChat, shouldSearchKnowledgeBase } from "../lib/study/inten
 import { collectHitResourceTitles, createEmptyRag, getStrongRag } from "../lib/study/rag-policy";
 import { buildAssistantReply, buildContextStudyPlan, isStudyPlanRequest } from "../lib/study/reply-policy";
 import { canAutoOpenPanel, getStudySessionStatus, shouldAllowLearningProgress } from "../lib/study/session-policy";
+import { inferLearnerLevel } from "../lib/study/adaptive";
 import { resolveLlmProviderConfig } from "../lib/secretStore";
 import { generateStudyAnswer, generateStudyConversationTitle, sanitizeLlmText } from "../lib/llm";
 import { findLearningResources } from "../lib/webResourceAgent";
@@ -759,7 +760,8 @@ export function useStudySession(routeContext: StudyLocationState | null, routeCo
       return;
     }
 
-    const nextPracticeSet = createPracticeSetFromRagResult(latestRag);
+    const learnerLevel = inferLearnerLevel(data.studyRecord.events);
+    const nextPracticeSet = createPracticeSetFromRagResult(latestRag, learnerLevel.difficulty);
     if (!nextPracticeSet) {
       setPracticeHint("当前命中资料还不足以生成质量稳定的题目，请换一个更具体的问题再试。");
       return;
@@ -783,7 +785,9 @@ export function useStudySession(routeContext: StudyLocationState | null, routeCo
     });
     setStudyInteractionCount((prev) => prev + 1);
     setPracticeSet(nextPracticeSet);
-    setPracticeHint(`已生成 ${nextPracticeSet.questions.length} 道题，番茄钟已开始为本组练习计时。`);
+    setPracticeHint(
+      `已按「${learnerLevel.difficulty}」难度生成 ${nextPracticeSet.questions.length} 道题（${learnerLevel.reason}）番茄钟已开始为本组练习计时。`
+    );
     setPomodoroSeconds(totalSeconds);
     setPomodoroRunning(true);
     setActivePanel("resource");
