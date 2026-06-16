@@ -97,16 +97,16 @@ const STOP_WORDS = new Set([
   "are",
 ]);
 
+// 仅保留跨学科通用的学习类同义词。学科特定术语（如具体定理、概念）
+// 由 extractAutoSynonymGroups 从用户自己的资料库自动派生，避免把任何单一
+// 学科的知识写死在检索逻辑里。
 const SYNONYM_GROUPS = [
-  ["平均变化率", "割线斜率", "平均速度"],
-  ["瞬时变化率", "导数", "切线斜率", "瞬时速度"],
-  ["中值定理", "拉格朗日中值定理", "拉格朗日定理"],
-  ["罗尔定理", "rolle定理", "rolle theorem"],
-  ["几何意义", "图像意义", "直观意义"],
+  ["几何意义", "图像意义", "直观意义", "含义"],
   ["使用条件", "成立条件", "前提条件", "适用条件"],
-  ["证明思路", "证明方法", "推导思路"],
-  ["应用", "题型", "用法", "应用题"],
-  ["单调性", "增减性"],
+  ["证明思路", "证明方法", "推导思路", "推导过程"],
+  ["应用", "题型", "用法", "例题", "应用题"],
+  ["定义", "概念", "含义"],
+  ["区别", "差异", "对比", "异同"],
   ["估值", "误差估计", "近似估计"],
 ];
 
@@ -304,15 +304,16 @@ function buildQueryTerms(data: AppData, query: string, selectedNode: KnowledgeNo
   const baseTerms = tokenize(query);
   const synonymTerms = baseTerms.flatMap((term) => getSynonymExpansions(term, autoGroups));
   const nodeTerms = getNodeExpansionTerms(data, selectedNode, autoGroups);
+  // 仅做与学科无关的问句改写：把模糊的提问词映射到通用的学习意图术语，
+  // 不注入任何特定学科的知识点。学科召回交给自动同义词与节点扩展。
   const reformulatedTerms = [
     ...baseTerms,
     ...synonymTerms,
-    ...tokenize(query.replace(/什么意思|怎么理解|讲讲|解释一下/g, "几何意义 使用条件")),
-    ...tokenize(query.replace(/证明|推导/g, "证明思路 前提条件 罗尔定理")),
+    ...tokenize(query.replace(/什么意思|怎么理解|讲讲|解释一下|是什么/g, "定义 含义 概念")),
+    ...tokenize(query.replace(/证明|推导/g, "证明思路 推导过程 前提条件")),
     ...tokenize(query.replace(/应用|做题|题型/g, "应用 题型 例题")),
-    ...tokenize(query.replace(/条件|前提/g, "使用条件 成立条件 闭区间连续 开区间可导")),
-    ...tokenize(query.replace(/导数/g, "瞬时变化率 切线斜率 导数")),
-    ...tokenize(query.replace(/中值定理/g, "拉格朗日中值定理 割线斜率")),
+    ...tokenize(query.replace(/条件|前提/g, "使用条件 成立条件 前提条件")),
+    ...tokenize(query.replace(/区别|不同|差异/g, "区别 对比 异同")),
     ...tokenize(nodeTerms.join(" ")),
   ];
 

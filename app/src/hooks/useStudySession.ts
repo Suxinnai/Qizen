@@ -37,6 +37,16 @@ import {
   type PersistedStudyConversation,
 } from "../lib/studyConversations";
 import { getStudyTree, flattenTasks, buildInitialMessages } from "../lib/study/study-helpers";
+import {
+  buildLearningStartMarkdown,
+  buildNoteBlock,
+  buildPlanMarkdown,
+  buildPlanSteps,
+  buildResourceMarkdown,
+  inferLearningTopic,
+  isPlanConfirmation,
+  wantsResourceAgent,
+} from "../lib/study/message-builders";
 import type { ChatMessage, PanelKey, StudyJourneyStage, StudyLocationState, StudyPlanStep, StudyResourceLead } from "../lib/study/types";
 
 const STREAM_CHUNK_SIZE = 8;
@@ -44,101 +54,6 @@ const STREAM_DELAY_MS = 14;
 
 function wait(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
-}
-
-function inferLearningTopic(text: string) {
-  return (
-    text
-      .replace(/^(我想|我要|帮我|请帮我|想要|计划|学习|学一下|学)\s*/g, "")
-      .replace(/(怎么学|如何学|学习计划|计划|路线|资源|资料|一下|可以吗|吧|。|！|!|\?)$/g, "")
-      .trim()
-      .slice(0, 36) || "这个主题"
-  );
-}
-
-function isPlanConfirmation(text: string) {
-  return /^(确认|可以|就这样|按这个|按计划|开始|开始学习|执行|确定|没问题)/.test(text.trim());
-}
-
-function wantsResourceAgent(text: string) {
-  return /(资料|资源|网站|课程|视频|论文|书|练习|题目|查找|搜索|网上|推荐)/.test(text);
-}
-
-function buildPlanSteps(topic: string, style: TeachingStyle): StudyPlanStep[] {
-  const methodStep =
-    style === "logic"
-      ? "先建立概念边界和推导链"
-      : style === "steps"
-      ? "拆成可检查的小步骤"
-      : style === "story"
-      ? "用场景和问题把概念串起来"
-      : "先用类比建立直觉";
-
-  return [
-    { id: "plan-step-1", title: `${topic}：明确目标与已有基础`, minutes: 10 },
-    { id: "plan-step-2", title: `${methodStep}`, minutes: 20 },
-    { id: "plan-step-3", title: `阅读/观看 2-3 份高质量资料并做摘记`, minutes: 30 },
-    { id: "plan-step-4", title: `完成一组针对 ${topic} 的练习题`, minutes: 25 },
-    { id: "plan-step-5", title: `复述总结并标记路线进度`, minutes: 10 },
-  ];
-}
-
-function buildPlanMarkdown(topic: string, steps: StudyPlanStep[], style: TeachingStyle) {
-  const styleText: Record<TeachingStyle, string> = {
-    story: "故事化讲解",
-    logic: "逻辑推导",
-    analogy: "类比讲解",
-    steps: "步骤拆解",
-  };
-  const totalMinutes = steps.reduce((sum, step) => sum + step.minutes, 0);
-  return [
-    `## ${topic} 学习计划`,
-    `我先按「${styleText[style]}」来带你学，预计 ${totalMinutes} 分钟完成一轮闭环。`,
-    "",
-    "### 执行路线",
-    ...steps.map((step, index) => `${index + 1}. ${step.title}（${step.minutes} 分钟）`),
-    "",
-    "> 如果这个节奏可以，点「确认计划」或直接回复“确认”，我会把它写入路线进度，并启动资源查找 Agent。",
-  ].join("\n");
-}
-
-function buildResourceMarkdown(topic: string, leads: StudyResourceLead[], errorSummary?: string) {
-  const liveCount = leads.filter((lead) => lead.live).length;
-  return [
-    `## ${topic} 资源 Agent 已完成一轮查找`,
-    liveCount > 0
-      ? `我已完成在线检索，并找到 ${liveCount} 个可直接打开的结果；同时保留本地资料和搜索入口作为补充。`
-      : "在线检索未拿到可直接引用的结果，我已降级为本地资料和可点击搜索入口，仍按学习阶段排好顺序。",
-    errorSummary ? `> 检索说明：${errorSummary}` : "",
-    "",
-    "### 推荐顺序",
-    ...leads.map((lead, index) => `${index + 1}. **${lead.title}** - ${lead.reason}`),
-    "",
-    "> 下一步我会从第一项开始引导你学。需要做题时，我会打开番茄钟并基于资料生成题目。",
-  ].join("\n");
-}
-
-function buildLearningStartMarkdown(topic: string) {
-  return [
-    `## 开始学习：${topic}`,
-    "先做第一轮：用 10 分钟把目标、边界和已有基础说清楚。",
-    "",
-    "- 你可以直接回答：你现在对这个主题已经知道什么？",
-    "- 如果不确定，我会用三个问题帮你定位基础。",
-    "- 需要练习时点右侧“资料与依据”里的出题按钮，番茄钟会用来计时。",
-  ].join("\n");
-}
-
-function buildNoteBlock(title: string, content: string) {
-  const compact = content
-    .replace(/^#{1,6}\s+/gm, "")
-    .replace(/\*\*/g, "")
-    .split(/\n+/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .slice(0, 8);
-
-  return [`## ${title}`, "", "### AI 整理", ...compact.map((line) => `- ${line.replace(/^[-*\d.]+\s*/, "")}`)].join("\n");
 }
 
 export function useStudySession(routeContext: StudyLocationState | null, routeContextKey: string) {
@@ -224,8 +139,6 @@ export function useStudySession(routeContext: StudyLocationState | null, routeCo
     ? selectedNode
       ? `${selectedNode.label} · ${selectedResource.summary}`
       : selectedResource.summary
-    : activeMilestone?.title.includes("微分中值定理")
-    ? "理解拉格朗日中值定理及其几何意义"
     : activeMilestone
     ? "理解" + activeMilestone.title.replace(/^第\s*\d+\s*章\s*/, "")
     : selectedTask?.meta ?? `今日完成 ${completedToday}/${tasks.length}`;
@@ -632,17 +545,101 @@ export function useStudySession(routeContext: StudyLocationState | null, routeCo
     if (shouldRunResourceAgent) triggerHints.push("resource");
     const shouldUseModelForAnswer = !isLocalIntent && !shouldCreatePlan && !shouldRunResourceAgent;
     const providerConfig = await resolveLlmProviderConfig(data.settings.llm);
-    const llmResult = shouldUseModelForAnswer
-      ? await generateStudyAnswer({
-          query: text,
-          rag,
-          style: teachingStyle,
-          profileText,
-          selectedResourceTitle: selectedResource?.title,
-          selectedNodeLabel: selectedNode?.label,
-          providerConfig,
-        })
-      : { answer: "", usedFallback: true, providerLabel: "本地回答", errorSummary: undefined };
+
+    // 学习型问题：走真实模型并实时流式渲染（成功时 token 逐步到达）。
+    if (shouldUseModelForAnswer) {
+      const assistantId = "a-" + (Date.now() + 1);
+      const sharedTriggers = triggerHints.length ? Array.from(new Set(triggerHints)) : undefined;
+      const streamingShell: ChatMessage = {
+        id: assistantId,
+        role: "assistant",
+        kind: "normal",
+        content: "",
+        streamState: "streaming",
+        thinking: ["理解问题", hasHits ? "匹配资料依据" : "未命中本地资料", "组织 Markdown 回答"],
+        triggers: sharedTriggers,
+        rag: hasHits ? rag : undefined,
+      };
+      setMessages((prev) => [...prev, streamingShell]);
+
+      let rawAnswer = "";
+      const llmResult = await generateStudyAnswer({
+        query: text,
+        rag,
+        style: teachingStyle,
+        profileText,
+        selectedResourceTitle: selectedResource?.title,
+        selectedNodeLabel: selectedNode?.label,
+        providerConfig,
+        onToken: (delta) => {
+          rawAnswer += delta;
+          const display = sanitizeLlmText(rawAnswer);
+          setMessages((prev) =>
+            prev.map((item) => (item.id === assistantId ? { ...item, content: display } : item))
+          );
+        },
+      });
+
+      const finalContent = sanitizeLlmText(
+        llmResult.usedFallback
+          ? `${buildAssistantReply({
+              query: text,
+              style: teachingStyle,
+              selectedResourceTitle: selectedResource?.title,
+              selectedNodeLabel: selectedNode?.label,
+              rag,
+            })}\n\n${
+              llmResult.errorSummary
+                ? `（已回退到本地回答：${llmResult.errorSummary}）`
+                : "（当前未使用真实模型，已回退到本地回答。）"
+            }`
+          : llmResult.answer
+      );
+
+      const finalMessage: ChatMessage = {
+        ...streamingShell,
+        content: finalContent,
+        streamState: "done",
+        providerLabel: llmResult.providerLabel,
+        usedFallback: llmResult.usedFallback,
+        errorSummary: llmResult.errorSummary,
+      };
+      setMessages((prev) => prev.map((item) => (item.id === assistantId ? finalMessage : item)));
+
+      appendStudySessionEvent({
+        id: `study-event-${Date.now()}`,
+        type: "ask",
+        recordedAt: new Date().toISOString(),
+        question: text,
+        resourceId: selectedResource?.id ?? null,
+        nodeId: selectedNode?.id ?? null,
+        taskId: conversationContext?.taskId ?? null,
+        hitResourceTitles: collectHitResourceTitles(rag),
+        generatedPractice: false,
+        llm: {
+          usedRealModel: !llmResult.usedFallback,
+          providerLabel: llmResult.providerLabel,
+          usedFallback: llmResult.usedFallback,
+        },
+      });
+
+      if (data.settings.autoAppendNote && sharedTriggers?.includes("note")) {
+        const targetNote = selectedNote ?? data.notes[0];
+        const noteBlock = `\n\n## ${learningGoal}\n${finalContent}`;
+        setNoteDraft((prev) => {
+          const next = prev.trim() ? `${prev.trimEnd()}${noteBlock}` : noteBlock.trim();
+          if (targetNote) updateNote(targetNote.id, next);
+          return next;
+        });
+      }
+
+      setStudyInteractionCount((prev) => prev + 1);
+      setIsGeneratingAnswer(false);
+      void refreshConversationTitle([...messages, userMessage, finalMessage]);
+      return;
+    }
+
+    const llmResult = { answer: "", usedFallback: true, providerLabel: "本地回答", errorSummary: undefined as string | undefined };
 
     const topic = inferLearningTopic(text);
     const planSteps = shouldCreatePlan ? buildPlanSteps(topic, teachingStyle) : [];

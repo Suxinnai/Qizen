@@ -323,6 +323,21 @@ function extractTermsFromLibraryItem(item: { title: string; summary: string; hig
   return candidates;
 }
 
+function findLinkedNodeIdsForItem(
+  item: { title: string; summary: string; highlights: string[] },
+  nodes: KnowledgeNode[]
+): string[] {
+  const haystack = [item.title, item.summary, ...item.highlights].filter(Boolean).join(" ");
+  if (!haystack) return [];
+  const ids: string[] = [];
+  for (const node of nodes) {
+    if (node.label && node.label.length >= 2 && haystack.includes(node.label)) {
+      ids.push(node.id);
+    }
+  }
+  return Array.from(new Set(ids)).slice(0, 8);
+}
+
 function buildKnowledgeNodesFromLibraryItems(
   existingGraph: KnowledgeGraph,
   newItems: { title: string; summary: string; highlights: string[]; linkedNodeIds: string[] }[],
@@ -870,7 +885,8 @@ export function addParsedLibraryItems(items: ParsedLibraryItemInput[]) {
       preview: item.preview,
       summary: item.summary,
       highlights: item.highlights,
-      linkedNodeIds: item.linkedNodeIds,
+      // 先关联到已存在的图谱节点，使建图时能生成连边；建图后再补上新建节点。
+      linkedNodeIds: findLinkedNodeIdsForItem(item, data.knowledgeGraph.nodes),
       pageCount: item.pageCount,
     }));
 
@@ -899,9 +915,15 @@ export function addParsedLibraryItems(items: ParsedLibraryItemInput[]) {
       })),
     );
 
+    // 建图后，关联范围扩展到新建节点，让资料"关联知识节点"展示真实可点的节点。
+    const linkedLibraryItems = newLibraryItems.map((item) => ({
+      ...item,
+      linkedNodeIds: findLinkedNodeIdsForItem(item, nextGraph.nodes),
+    }));
+
     return {
       ...data,
-      libraryItems: [...newLibraryItems, ...data.libraryItems],
+      libraryItems: [...linkedLibraryItems, ...data.libraryItems],
       practiceSets: [...newPracticeSets, ...data.practiceSets],
       knowledgeGraph: nextGraph,
     };
