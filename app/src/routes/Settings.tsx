@@ -12,6 +12,7 @@ import {
   type LlmProviderType,
 } from "../lib/storage";
 import { clearStudyConversations } from "../lib/studyConversations";
+import { Switch } from "../components/ui/Switch";
 
 type ConnectionStatus =
   | { kind: "idle" }
@@ -49,7 +50,7 @@ function ToggleRow({
         </div>
         {desc ? <div className="text-[12px] text-qz-text-muted mt-1">{desc}</div> : null}
       </div>
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="accent-[#2D7A6B]" />
+      <Switch checked={checked} onChange={onChange} />
     </label>
   );
 }
@@ -176,14 +177,14 @@ export default function Settings() {
           <p className="font-serif italic text-[14px] text-qz-text-muted">管理模型、自动化行为和本地数据策略</p>
         </div>
 
-        <div className="qz-card space-y-5">
-          <div>
+        <div className="flex flex-col gap-5">
+          <div className="px-1">
             <div className="text-[11px] tracking-[0.24em] uppercase text-qz-primary mb-2 font-semibold">PREFERENCES · 参数配置</div>
             <h2 className="font-serif text-[24px] text-qz-text-strong dark:text-qz-text-dark">个性化智能学习环境</h2>
           </div>
 
-          <div className="space-y-4">
-            <div>
+          <div className="flex flex-col gap-5">
+            <div className="qz-card">
               <div className="font-serif text-[20px] text-qz-text-strong dark:text-qz-text-dark mb-3">基本信息</div>
               <div className="space-y-3">
                 <label className="block rounded-[14px] border border-black/[0.05] dark:border-white/[0.08] px-4 py-3">
@@ -198,7 +199,7 @@ export default function Settings() {
               </div>
             </div>
 
-            <div>
+            <div className="qz-card">
               <div className="font-serif text-[20px] text-qz-text-strong dark:text-qz-text-dark mb-3">模型与 API</div>
               <div className="space-y-3">
                 <label className="block rounded-[14px] border border-black/[0.05] dark:border-white/[0.08] px-4 py-3">
@@ -268,7 +269,7 @@ export default function Settings() {
               </div>
             </div>
 
-            <div>
+            <div className="qz-card">
               <div className="font-serif text-[20px] text-qz-text-strong dark:text-qz-text-dark mb-3">自动化行为</div>
               <div className="space-y-3">
                 <ToggleRow label="AI 自动启动番茄钟" checked={settings.autoStartPomodoro} onChange={(value) => patch("autoStartPomodoro", value)} />
@@ -289,7 +290,7 @@ export default function Settings() {
               </div>
             </div>
 
-            <div>
+            <div className="qz-card">
               <div className="font-serif text-[20px] text-qz-text-strong dark:text-qz-text-dark mb-3">记忆与数据</div>
               <div className="space-y-3">
                 <label className="block rounded-[14px] border border-black/[0.05] dark:border-white/[0.08] px-4 py-3">
