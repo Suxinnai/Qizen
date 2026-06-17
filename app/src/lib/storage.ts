@@ -73,6 +73,8 @@ export interface StudySessionEvent {
   generatedPractice: boolean;
   practiceScore?: number;
   practiceQuestionCount?: number;
+  /** 被判为"部分/错"的题干，喂给长期记忆派生真实常错点 */
+  weakQuestionPrompts?: string[];
   progressAction?: "task-completed" | "node-reviewed" | "blocked";
   llm: LlmAnswerRecord;
 }

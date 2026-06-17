@@ -1,5 +1,5 @@
 import { BookMarked, ExternalLink, Search } from "lucide-react";
-import { PracticePanel } from "../PracticePanel";
+import { PracticePanel, type PracticeQuestionResult, type PracticeVerdict } from "../PracticePanel";
 import { scoreLabel } from "../../../lib/study/rag-policy";
 import { loadAppData, type LibraryItem } from "../../../lib/storage";
 import type { LibraryRagResult, RagPracticeSet } from "../../../lib/rag";
@@ -11,8 +11,15 @@ export function ResourcePanel({
   resourceLeads,
   practiceSet,
   practiceHint,
+  practiceAnswers,
+  practiceResults,
+  isGradingPractice,
+  practiceGraded,
+  practiceSelfAssess,
   onGeneratePractice,
-  onCompletePractice,
+  onAnswerChange,
+  onSubmitGrade,
+  onSelfVerdict,
   onSelectResource,
 }: {
   selectedResource?: LibraryItem;
@@ -20,8 +27,15 @@ export function ResourcePanel({
   resourceLeads?: StudyResourceLead[];
   practiceSet: RagPracticeSet | null;
   practiceHint: string;
+  practiceAnswers: Record<string, string>;
+  practiceResults: Record<string, PracticeQuestionResult> | null;
+  isGradingPractice: boolean;
+  practiceGraded: boolean;
+  practiceSelfAssess: boolean;
   onGeneratePractice: () => void;
-  onCompletePractice: () => void;
+  onAnswerChange: (id: string, value: string) => void;
+  onSubmitGrade: () => void;
+  onSelfVerdict: (id: string, verdict: PracticeVerdict) => void;
   onSelectResource?: (id: string | null) => void;
 }) {
   const data = loadAppData();
@@ -134,7 +148,17 @@ export function ResourcePanel({
         </div>
       ) : null}
 
-      <PracticePanel practice={practiceSet} onComplete={onCompletePractice} />
+      <PracticePanel
+        practice={practiceSet}
+        answers={practiceAnswers}
+        results={practiceResults}
+        isGrading={isGradingPractice}
+        graded={practiceGraded}
+        selfAssessMode={practiceSelfAssess}
+        onAnswerChange={onAnswerChange}
+        onSubmitGrade={onSubmitGrade}
+        onSelfVerdict={onSelfVerdict}
+      />
 
       {/* 推荐资料 */}
       <div>

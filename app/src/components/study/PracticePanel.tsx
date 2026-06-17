@@ -77,16 +77,51 @@ export function PracticeEvidencePanel({ evidence }: { evidence?: PracticeQuestio
   );
 }
 
+export type PracticeVerdict = "对" | "部分" | "错";
+export interface PracticeQuestionResult {
+  verdict: PracticeVerdict;
+  comment: string;
+}
+
+const VERDICT_WEIGHT: Record<PracticeVerdict, number> = { 对: 1, 部分: 0.5, 错: 0 };
+
+function verdictChipClass(verdict: PracticeVerdict) {
+  if (verdict === "对") return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20";
+  if (verdict === "部分") return "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20";
+  return "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20";
+}
+
 export function PracticePanel({
   practice,
-  onComplete,
+  answers,
+  results,
+  isGrading,
+  graded,
+  selfAssessMode,
+  gradeHint,
+  onAnswerChange,
+  onSubmitGrade,
+  onSelfVerdict,
 }: {
   practice: RagPracticeSet | null;
-  onComplete?: () => void;
+  answers: Record<string, string>;
+  results: Record<string, PracticeQuestionResult> | null;
+  isGrading: boolean;
+  graded: boolean;
+  selfAssessMode: boolean;
+  gradeHint?: string;
+  onAnswerChange: (id: string, value: string) => void;
+  onSubmitGrade: () => void;
+  onSelfVerdict: (id: string, verdict: PracticeVerdict) => void;
 }) {
   const [expandedQuestionIds, setExpandedQuestionIds] = useState<string[]>([]);
 
   if (!practice) return null;
+
+  const scoreValue = graded && results
+    ? practice.questions.reduce((sum, q) => sum + (results[q.id] ? VERDICT_WEIGHT[results[q.id].verdict] : 0), 0)
+    : 0;
+  const scoreText = Number.isInteger(scoreValue) ? `${scoreValue}` : scoreValue.toFixed(1);
 
   return (
     <div className="mt-4 rounded-[18px] border border-qz-primary/15 bg-qz-primary/6 px-4 py-4">
@@ -99,6 +134,11 @@ export function PracticePanel({
           </div>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
+          {graded ? (
+            <span className="text-[10px] px-2 py-1 rounded-full bg-qz-primary text-white font-bold">
+              得分 {scoreText} / {practice.questions.length}
+            </span>
+          ) : null}
           <span className="text-[10px] px-2 py-1 rounded-full bg-qz-primary/10 text-qz-primary font-bold">
             {practice.difficulty}
           </span>
@@ -111,26 +151,62 @@ export function PracticePanel({
       <div className="space-y-3">
         {practice.questions.map((question, index) => {
           const expanded = expandedQuestionIds.includes(question.id);
-          const evidence = question.evidence;
-          const tone = getEvidenceTone(evidence?.confidence);
-          const sourceBadge = evidence?.isCurrentResource
-            ? "来自当前资料"
-            : evidence?.isCurrentNodeLinked
-            ? "来自节点关联资料"
-            : evidence?.isTopHit
-            ? "来自 top hit"
-            : "来源待确认";
+          const result = results?.[question.id];
 
           return (
             <div key={question.id} className="rounded-[14px] border border-black/[0.05] dark:border-white/[0.06] bg-white/70 dark:bg-black/10 px-3.5 py-3">
               <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <span className="text-[10px] px-2 py-1 rounded-full bg-qz-primary/10 text-qz-primary">{question.type}</span>
                 <span className="text-[11px] text-qz-text-muted">第 {index + 1} 题</span>
-                <span className={clsx("text-[10px] px-2 py-1 rounded-full", tone.chipClass)}>{sourceBadge}</span>
-                <span className={clsx("text-[10px] px-2 py-1 rounded-full", tone.chipClass)}>{tone.label}</span>
+                {result ? (
+                  <span className={clsx("text-[10px] px-2 py-1 rounded-full border font-bold", verdictChipClass(result.verdict))}>
+                    {result.verdict}
+                  </span>
+                ) : null}
               </div>
               <div className="text-[13px] text-qz-text-strong dark:text-qz-text-dark leading-6">{question.prompt}</div>
               <div className="mt-2 text-[11px] text-qz-text-muted leading-6">提示：{question.answerHint}</div>
+
+              {/* 答题输入 */}
+              <textarea
+                value={answers[question.id] ?? ""}
+                onChange={(event) => onAnswerChange(question.id, event.target.value)}
+                disabled={isGrading || graded}
+                placeholder="在这里写下你的作答…"
+                rows={2}
+                className="mt-2.5 w-full rounded-[10px] border border-black/[0.08] dark:border-white/[0.1] bg-white/80 dark:bg-black/20 px-3 py-2 text-[12.5px] leading-6 outline-none focus:border-qz-primary/60 transition-colors resize-y disabled:opacity-70"
+              />
+
+              {/* 自评 chips（无模型降级） */}
+              {selfAssessMode && !graded ? (
+                <div className="mt-2 flex items-center gap-1.5">
+                  <span className="text-[11px] text-qz-text-muted">自评：</span>
+                  {(["对", "部分", "错"] as PracticeVerdict[]).map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => onSelfVerdict(question.id, v)}
+                      className={clsx(
+                        "text-[11px] px-2.5 py-1 rounded-full border transition-colors cursor-pointer",
+                        result?.verdict === v
+                          ? verdictChipClass(v) + " font-bold"
+                          : "border-black/[0.08] dark:border-white/[0.12] text-qz-text-muted hover:border-qz-primary/40"
+                      )}
+                    >
+                      {v}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
+              {/* 批改意见 */}
+              {result && result.comment ? (
+                <div className="mt-2 text-[11.5px] leading-6 text-qz-text-muted">
+                  <span className="text-qz-text-strong dark:text-qz-text-dark">批改：</span>
+                  {result.comment}
+                </div>
+              ) : null}
+
               <button
                 type="button"
                 onClick={() =>
@@ -147,15 +223,25 @@ export function PracticePanel({
           );
         })}
       </div>
-      {onComplete ? (
+
+      {gradeHint ? (
+        <div className="mt-3 text-[11px] text-qz-text-muted leading-6">{gradeHint}</div>
+      ) : null}
+
+      {!graded ? (
         <button
           type="button"
-          onClick={onComplete}
-          className="mt-4 w-full h-9 rounded-full bg-qz-primary text-white text-[12px] hover:bg-qz-dark transition-colors"
+          onClick={onSubmitGrade}
+          disabled={isGrading}
+          className="mt-4 w-full h-9 rounded-full bg-qz-primary text-white text-[12px] hover:bg-qz-dark transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          标记本组练习已完成
+          {isGrading ? "批改中…" : selfAssessMode ? "记录自评结果" : "提交批改"}
         </button>
-      ) : null}
+      ) : (
+        <div className="mt-4 text-center text-[12px] text-qz-primary font-medium">
+          本组已批改完成，得分 {scoreText} / {practice.questions.length}
+        </div>
+      )}
     </div>
   );
 }

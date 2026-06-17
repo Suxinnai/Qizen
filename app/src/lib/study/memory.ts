@@ -7,9 +7,14 @@ import { inferLearningTopic } from "./message-builders";
 
 export interface WeakPoint {
   key: string;
-  kind: "resource" | "topic";
+  kind: "resource" | "topic" | "practice";
   occurrences: number;
   lastSeenAt: string;
+}
+
+function shortenPrompt(prompt: string): string {
+  const stripped = prompt.replace(/^(判断|简答|填空|应用|综合)(并说明理由)?[:：]\s*/, "").trim();
+  return stripped.length <= 26 ? stripped : `${stripped.slice(0, 26)}…`;
 }
 
 export interface StudyStreak {
@@ -22,6 +27,8 @@ export interface LearnerMemory {
   streak: StudyStreak;
   totalActiveDays: number;
   weakPoints: WeakPoint[];
+  /** 是否存在来自练习判分的真实答错点（决定 UI 用"常错点"还是"需巩固的点"） */
+  hasGradedWeakPoints: boolean;
   realModelRatio: number;
   preferredProvider: string | null;
   totalInteractions: number;
@@ -64,29 +71,36 @@ export function deriveLearnerMemory(data: AppData): LearnerMemory {
   const events = data.studyRecord.events;
   const { current, longest, lastStudyDate, totalActiveDays } = deriveStreak(data.studyStats.dailyMinutes);
 
-  // 聚合"反复涉及的点"：命中资料标题 + 提问主题，按出现次数累计。
-  const tally = new Map<string, WeakPoint>();
-  const bump = (rawKey: string, kind: WeakPoint["kind"], at: string) => {
+  const bumpInto = (map: Map<string, WeakPoint>, rawKey: string, kind: WeakPoint["kind"], at: string) => {
     const key = rawKey.trim();
     if (!key || key === "这个主题") return;
-    const existing = tally.get(key.toLowerCase());
+    const existing = map.get(key.toLowerCase());
     if (existing) {
       existing.occurrences += 1;
       if (at > existing.lastSeenAt) existing.lastSeenAt = at;
     } else {
-      tally.set(key.toLowerCase(), { key, kind, occurrences: 1, lastSeenAt: at });
+      map.set(key.toLowerCase(), { key, kind, occurrences: 1, lastSeenAt: at });
     }
   };
 
+  // 真实答错点：来自练习判分（LLM/自评），单次即计入、排在最前。
+  const practiceTally = new Map<string, WeakPoint>();
+  // 反复涉及的点：命中资料标题 + 提问主题，需 ≥2 次才显现。
+  const frequencyTally = new Map<string, WeakPoint>();
+
   for (const event of events) {
-    for (const title of event.hitResourceTitles) bump(title, "resource", event.recordedAt);
-    if (event.type === "ask") bump(inferLearningTopic(event.question), "topic", event.recordedAt);
+    if (event.type === "practice-completed" && event.weakQuestionPrompts) {
+      for (const prompt of event.weakQuestionPrompts) bumpInto(practiceTally, shortenPrompt(prompt), "practice", event.recordedAt);
+    }
+    for (const title of event.hitResourceTitles) bumpInto(frequencyTally, title, "resource", event.recordedAt);
+    if (event.type === "ask") bumpInto(frequencyTally, inferLearningTopic(event.question), "topic", event.recordedAt);
   }
 
-  const weakPoints = Array.from(tally.values())
-    .filter((point) => point.occurrences >= 2)
-    .sort((a, b) => b.occurrences - a.occurrences || (a.lastSeenAt < b.lastSeenAt ? 1 : -1))
-    .slice(0, 5);
+  const byScore = (a: WeakPoint, b: WeakPoint) => b.occurrences - a.occurrences || (a.lastSeenAt < b.lastSeenAt ? 1 : -1);
+  const practicePoints = Array.from(practiceTally.values()).sort(byScore);
+  const frequencyPoints = Array.from(frequencyTally.values()).filter((p) => p.occurrences >= 2).sort(byScore);
+  const weakPoints = [...practicePoints, ...frequencyPoints].slice(0, 5);
+  const hasGradedWeakPoints = practicePoints.length > 0;
 
   const realCount = events.filter((event) => !event.llm.usedFallback).length;
   const realModelRatio = events.length > 0 ? realCount / events.length : 0;
@@ -103,6 +117,7 @@ export function deriveLearnerMemory(data: AppData): LearnerMemory {
     streak: { current, longest, lastStudyDate },
     totalActiveDays,
     weakPoints,
+    hasGradedWeakPoints,
     realModelRatio,
     preferredProvider,
     totalInteractions: events.length,
