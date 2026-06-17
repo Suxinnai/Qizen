@@ -618,6 +618,175 @@ function EventTimeline({
   );
 }
 
+/** 30 天学习热力图（GitHub 贡献图风格） */
+function ActivityHeatmap({ dailyMinutes }: { dailyMinutes: number[] }) {
+  const days = dailyMinutes.slice(-30);
+  const max = Math.max(...days, 1);
+  const today = new Date();
+
+  const cells: ({ date: Date; minutes: number } | null)[] = days.map((minutes, i) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() - (days.length - 1 - i));
+    return { date, minutes };
+  });
+
+  const firstDow = cells[0]?.date.getDay() ?? 0;
+  const padded: ({ date: Date; minutes: number } | null)[] = [...Array(firstDow).fill(null), ...cells];
+  const weeks: ({ date: Date; minutes: number } | null)[][] = [];
+  for (let i = 0; i < padded.length; i += 7) weeks.push(padded.slice(i, i + 7));
+
+  const totalMinutes = days.reduce((a, b) => a + b, 0);
+  const activeDays = days.filter((m) => m > 0).length;
+  const weekdayLabels = ["日", "一", "二", "三", "四", "五", "六"];
+
+  function cellStyle(minutes: number) {
+    if (minutes <= 0) return "bg-black/[0.04] dark:bg-white/[0.05]";
+    const ratio = minutes / max;
+    if (ratio > 0.75) return "bg-[#2D7A6B]";
+    if (ratio > 0.5) return "bg-[#4D9A8B]";
+    if (ratio > 0.25) return "bg-[#5BA593]";
+    return "bg-[#9CC8BC] dark:bg-[#3C7468]";
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay: 0.35 }}
+      className="qz-card"
+    >
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-2 text-qz-primary">
+          <CalendarDays size={18} />
+          <h2 className="font-serif text-[22px] font-bold">30 天学习热力图</h2>
+        </div>
+        <div className="text-[11px] text-qz-text-muted px-2.5 py-1 rounded-full bg-black/[0.03] dark:bg-white/[0.04]">
+          活跃 {activeDays} 天 · 共 {totalMinutes} 分钟
+        </div>
+      </div>
+
+      <div className="flex gap-2 items-start overflow-x-auto pb-2 scrollbar-thin">
+        {/* 周几标签 */}
+        <div className="flex flex-col gap-[5px] pr-1 pt-[1px] select-none">
+          {weekdayLabels.map((label, i) => (
+            <span key={label} className="h-[16px] text-[9px] text-qz-text-muted/60 font-mono leading-[16px]">
+              {i % 2 === 1 ? label : ""}
+            </span>
+          ))}
+        </div>
+        {/* 每周一列 */}
+        {weeks.map((week, wi) => (
+          <div key={wi} className="flex flex-col gap-[5px]">
+            {Array.from({ length: 7 }).map((_, di) => {
+              const cell = week[di];
+              if (!cell) return <div key={di} className="w-[16px] h-[16px]" />;
+              return (
+                <div
+                  key={di}
+                  title={`${cell.date.toLocaleDateString()} · ${cell.minutes} 分钟`}
+                  className={`w-[16px] h-[16px] rounded-[3px] ${cellStyle(cell.minutes)} transition-transform duration-150 hover:scale-125 hover:ring-1 hover:ring-qz-primary/40 cursor-default`}
+                />
+              );
+            })}
+          </div>
+        ))}
+      </div>
+
+      {/* 强度图例 */}
+      <div className="mt-4 flex items-center justify-end gap-1.5 text-[9.5px] text-qz-text-muted/70 select-none">
+        <span>少</span>
+        <div className="w-[12px] h-[12px] rounded-[3px] bg-black/[0.04] dark:bg-white/[0.05]" />
+        <div className="w-[12px] h-[12px] rounded-[3px] bg-[#9CC8BC] dark:bg-[#3C7468]" />
+        <div className="w-[12px] h-[12px] rounded-[3px] bg-[#5BA593]" />
+        <div className="w-[12px] h-[12px] rounded-[3px] bg-[#4D9A8B]" />
+        <div className="w-[12px] h-[12px] rounded-[3px] bg-[#2D7A6B]" />
+        <span>多</span>
+      </div>
+    </motion.div>
+  );
+}
+
+/** 模型使用占比：真实模型 vs 本地 fallback */
+function ModelUsageDonut({ events }: { events: { llm: { usedFallback: boolean } }[] }) {
+  const total = events.length;
+  const fallback = events.filter((event) => event.llm.usedFallback).length;
+  const real = total - fallback;
+  const realPct = total > 0 ? Math.round((real / total) * 100) : 0;
+
+  const radius = 54;
+  const circumference = 2 * Math.PI * radius;
+  const realLen = total > 0 ? (real / total) * circumference : 0;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay: 0.4 }}
+      className="qz-card flex flex-col"
+    >
+      <div className="flex items-center gap-2 mb-4 text-qz-primary">
+        <Activity size={18} />
+        <h2 className="font-serif text-[22px] font-bold">模型使用占比</h2>
+      </div>
+
+      {total > 0 ? (
+        <div className="flex-1 flex flex-col items-center justify-center gap-5 py-2">
+          <div className="relative w-36 h-36 flex items-center justify-center select-none">
+            <svg className="w-full h-full -rotate-90" viewBox="0 0 140 140">
+              <circle cx="70" cy="70" r={radius} fill="none" strokeWidth="16" className="stroke-amber-400/70 dark:stroke-amber-500/50" />
+              <motion.circle
+                cx="70"
+                cy="70"
+                r={radius}
+                fill="none"
+                stroke="#2D7A6B"
+                strokeWidth="16"
+                strokeLinecap="round"
+                strokeDasharray={`${realLen} ${circumference - realLen}`}
+                initial={{ strokeDasharray: `0 ${circumference}` }}
+                animate={{ strokeDasharray: `${realLen} ${circumference - realLen}` }}
+                transition={{ duration: 0.8, ease: "easeOut" }}
+              />
+            </svg>
+            <div className="absolute flex flex-col items-center">
+              <span className="font-serif text-[28px] font-bold text-qz-primary leading-none">{realPct}%</span>
+              <span className="text-[9px] text-qz-text-muted mt-1">真实模型</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 w-full">
+            <div className="rounded-2xl border border-black/[0.03] dark:border-white/[0.05] bg-black/[0.01] dark:bg-white/[0.01] px-4 py-3 text-center">
+              <div className="flex items-center justify-center gap-1.5 mb-1">
+                <div className="w-2 h-2 rounded-full bg-[#2D7A6B]" />
+                <span className="text-[10.5px] text-qz-text-muted font-medium">真实模型</span>
+              </div>
+              <div className="font-serif text-[22px] font-bold text-qz-primary leading-none">{real}</div>
+            </div>
+            <div className="rounded-2xl border border-black/[0.03] dark:border-white/[0.05] bg-black/[0.01] dark:bg-white/[0.01] px-4 py-3 text-center">
+              <div className="flex items-center justify-center gap-1.5 mb-1">
+                <div className="w-2 h-2 rounded-full bg-amber-400" />
+                <span className="text-[10.5px] text-qz-text-muted font-medium">本地 fallback</span>
+              </div>
+              <div className="font-serif text-[22px] font-bold text-amber-600 dark:text-amber-400 leading-none">{fallback}</div>
+            </div>
+          </div>
+          <p className="text-[11px] text-qz-text-muted/80 italic text-center leading-relaxed">
+            {realPct >= 80
+              ? "大部分回答来自真实模型，依据质量较稳。"
+              : realPct >= 40
+              ? "真实模型与本地回答各占一部分，可在设置里检查 API 配置。"
+              : "当前多为本地 fallback，配置模型后回答会更准确。"}
+          </p>
+        </div>
+      ) : (
+        <div className="flex-1 text-[13px] text-qz-text-muted flex items-center justify-center border border-dashed border-black/[0.05] dark:border-white/[0.05] rounded-xl min-h-[200px]">
+          暂无交互记录，提问后会统计模型来源。
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
 export default function Reports() {
   const data = useMemo(() => loadAppData(), []);
   const events = data.studyRecord.events;
@@ -683,6 +852,11 @@ export default function Reports() {
         <div className="grid lg:grid-cols-2 gap-6">
           <WeeklyBarChart dailyMinutes={data.studyStats.dailyMinutes} />
           <TopResourcesChart events={events} />
+        </div>
+
+        <div className="grid lg:grid-cols-[1.45fr,0.55fr] gap-6">
+          <ActivityHeatmap dailyMinutes={data.studyStats.dailyMinutes} />
+          <ModelUsageDonut events={events} />
         </div>
 
         <div className="grid lg:grid-cols-2 gap-6">

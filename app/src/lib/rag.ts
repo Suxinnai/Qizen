@@ -1,4 +1,5 @@
-import type { AppData, KnowledgeNode, LibraryItem, PracticeQuestion, PracticeQuestionEvidence } from "./storage";
+import type { AppData, KnowledgeNode, LibraryItem, PracticeDifficulty, PracticeQuestion, PracticeQuestionEvidence } from "./storage";
+import { PRACTICE_COUNT_BY_DIFFICULTY } from "./study/adaptive";
 
 export interface RetrieveRelevantLibraryContextOptions {
   resourceId?: string;
@@ -32,6 +33,7 @@ export interface RagPracticeSet {
   title: string;
   basedOnTitles: string[];
   primaryTitle: string;
+  difficulty: PracticeDifficulty;
   questions: PracticeQuestion[];
 }
 
@@ -97,16 +99,16 @@ const STOP_WORDS = new Set([
   "are",
 ]);
 
+// 仅保留跨学科通用的学习类同义词。学科特定术语（如具体定理、概念）
+// 由 extractAutoSynonymGroups 从用户自己的资料库自动派生，避免把任何单一
+// 学科的知识写死在检索逻辑里。
 const SYNONYM_GROUPS = [
-  ["平均变化率", "割线斜率", "平均速度"],
-  ["瞬时变化率", "导数", "切线斜率", "瞬时速度"],
-  ["中值定理", "拉格朗日中值定理", "拉格朗日定理"],
-  ["罗尔定理", "rolle定理", "rolle theorem"],
-  ["几何意义", "图像意义", "直观意义"],
+  ["几何意义", "图像意义", "直观意义", "含义"],
   ["使用条件", "成立条件", "前提条件", "适用条件"],
-  ["证明思路", "证明方法", "推导思路"],
-  ["应用", "题型", "用法", "应用题"],
-  ["单调性", "增减性"],
+  ["证明思路", "证明方法", "推导思路", "推导过程"],
+  ["应用", "题型", "用法", "例题", "应用题"],
+  ["定义", "概念", "含义"],
+  ["区别", "差异", "对比", "异同"],
   ["估值", "误差估计", "近似估计"],
 ];
 
@@ -304,15 +306,16 @@ function buildQueryTerms(data: AppData, query: string, selectedNode: KnowledgeNo
   const baseTerms = tokenize(query);
   const synonymTerms = baseTerms.flatMap((term) => getSynonymExpansions(term, autoGroups));
   const nodeTerms = getNodeExpansionTerms(data, selectedNode, autoGroups);
+  // 仅做与学科无关的问句改写：把模糊的提问词映射到通用的学习意图术语，
+  // 不注入任何特定学科的知识点。学科召回交给自动同义词与节点扩展。
   const reformulatedTerms = [
     ...baseTerms,
     ...synonymTerms,
-    ...tokenize(query.replace(/什么意思|怎么理解|讲讲|解释一下/g, "几何意义 使用条件")),
-    ...tokenize(query.replace(/证明|推导/g, "证明思路 前提条件 罗尔定理")),
+    ...tokenize(query.replace(/什么意思|怎么理解|讲讲|解释一下|是什么/g, "定义 含义 概念")),
+    ...tokenize(query.replace(/证明|推导/g, "证明思路 推导过程 前提条件")),
     ...tokenize(query.replace(/应用|做题|题型/g, "应用 题型 例题")),
-    ...tokenize(query.replace(/条件|前提/g, "使用条件 成立条件 闭区间连续 开区间可导")),
-    ...tokenize(query.replace(/导数/g, "瞬时变化率 切线斜率 导数")),
-    ...tokenize(query.replace(/中值定理/g, "拉格朗日中值定理 割线斜率")),
+    ...tokenize(query.replace(/条件|前提/g, "使用条件 成立条件 前提条件")),
+    ...tokenize(query.replace(/区别|不同|差异/g, "区别 对比 异同")),
     ...tokenize(nodeTerms.join(" ")),
   ];
 
@@ -528,7 +531,10 @@ function buildPracticeQuestionEvidence(match: LibraryRagMatch, isTopHit: boolean
   };
 }
 
-export function createPracticeSetFromRagResult(rag: LibraryRagResult): RagPracticeSet | null {
+export function createPracticeSetFromRagResult(
+  rag: LibraryRagResult,
+  difficulty: PracticeDifficulty = "基础"
+): RagPracticeSet | null {
   if (rag.results.length === 0) return null;
 
   const primary = rag.results[0];
@@ -542,45 +548,67 @@ export function createPracticeSetFromRagResult(rag: LibraryRagResult): RagPracti
   const secondSeed = seeds[1] ?? primary.matchedSnippet;
   const thirdSeed = seeds[2] ?? primary.matchedHighlights[0] ?? primary.matchedSummary;
   const fourthSeed = seeds[3] ?? secondary?.matchedHighlights[0] ?? primary.matchedSnippet;
+  const fifthSeed = seeds[4] ?? secondary?.matchedSummary ?? primary.matchedSnippet;
   const blankTerm = primary.matchedTerms[0] ?? primary.matchedHighlights[0] ?? primary.resource.title;
 
-  const questionMatches = [primary, primary, secondary ?? primary, secondary ?? primary];
+  // 难度越高，题目侧重越偏理解/应用/综合；越低越偏识记/判断。
+  const isAdvanced = difficulty !== "基础";
+  const synthesisMatch = secondary ?? primary;
 
-  const questions: PracticeQuestion[] = [
+  // 题池按由易到难排序：判断 → 填空 → 简答 → 应用 → 跨资料综合。
+  // 出题时根据难度档位截取前 N 题（基础 3 / 进阶 4 / 综合 5）。
+  const questionPool: PracticeQuestion[] = [
     {
       id: `${primary.resource.id}-rag-q1`,
       type: "判断",
-      prompt: `判断：根据《${primary.resource.title}》的命中内容，“${firstSeed}”属于这次问题相关的关键依据。`,
+      prompt: isAdvanced
+        ? `判断并说明理由：根据《${primary.resource.title}》的命中内容，“${firstSeed}”是否构成这次问题的关键依据？请给出判断依据。`
+        : `判断：根据《${primary.resource.title}》的命中内容，“${firstSeed}”属于这次问题相关的关键依据。`,
       answerHint: "先回看命中重点和命中片段，确认它是否被资料明确提到。",
-      evidence: buildPracticeQuestionEvidence(questionMatches[0], questionMatches[0] === primary),
+      evidence: buildPracticeQuestionEvidence(primary, true),
     },
     {
       id: `${primary.resource.id}-rag-q2`,
-      type: "简答",
-      prompt: `简答：只依据《${primary.resource.title}》的命中片段，说明“${secondSeed}”和你的问题有什么关系。`,
-      answerHint: "尽量引用片段里的条件、关系或结论，不要脱离资料自由发挥。",
-      evidence: buildPracticeQuestionEvidence(questionMatches[1], questionMatches[1] === primary),
-    },
-    {
-      id: `${primary.resource.id}-rag-q3`,
       type: "填空",
       prompt: createFillBlankPrompt(thirdSeed, blankTerm),
       answerHint: "优先从命中重点或片段里的术语中找答案。",
-      evidence: buildPracticeQuestionEvidence(questionMatches[2], questionMatches[2] === primary),
+      evidence: buildPracticeQuestionEvidence(primary, true),
+    },
+    {
+      id: `${primary.resource.id}-rag-q3`,
+      type: "简答",
+      prompt: `简答：只依据《${primary.resource.title}》的命中片段，说明“${secondSeed}”和你的问题有什么关系。`,
+      answerHint: "尽量引用片段里的条件、关系或结论，不要脱离资料自由发挥。",
+      evidence: buildPracticeQuestionEvidence(primary, true),
     },
     {
       id: `${primary.resource.id}-rag-q4`,
       type: "简答",
-      prompt: `简答：如果你要向同学解释这次命中的依据，可以怎样用“${fourthSeed}”做一个基于资料的说明？`,
+      prompt: isAdvanced
+        ? `应用：结合“${fourthSeed}”，举一个资料之外的例子来检验你是否真的理解了这个要点，并说明它为什么适用。`
+        : `简答：如果你要向同学解释这次命中的依据，可以怎样用“${fourthSeed}”做一个基于资料的说明？`,
       answerHint: "先说资料讲了什么，再说它为什么能支撑这次回答。",
-      evidence: buildPracticeQuestionEvidence(questionMatches[3], questionMatches[3] === primary),
+      evidence: buildPracticeQuestionEvidence(secondary ?? primary, !secondary),
+    },
+    {
+      id: `${primary.resource.id}-rag-q5`,
+      type: "简答",
+      prompt: secondary
+        ? `综合：把《${primary.resource.title}》和《${secondary.resource.title}》里关于“${fifthSeed}”的内容对照起来，说明它们的联系或差异，并给出一个综合结论。`
+        : `综合：围绕“${fifthSeed}”，自己提出一个进一步的问题，并尝试只用本资料给出有依据的回答。`,
+      answerHint: "先各自概括，再做对照或推进，最后落到一个明确结论。",
+      evidence: buildPracticeQuestionEvidence(synthesisMatch, synthesisMatch === primary),
     },
   ];
 
+  const count = PRACTICE_COUNT_BY_DIFFICULTY[difficulty];
+  const questions = questionPool.slice(0, count);
+
   return {
-    title: `基于当前命中资料生成的练习题`,
+    title: `基于当前命中资料生成的${difficulty}练习`,
     basedOnTitles: unique([primary.resource.title, secondary?.resource.title].filter(Boolean) as string[]),
     primaryTitle: primary.resource.title,
+    difficulty,
     questions,
   };
 }

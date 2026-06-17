@@ -37,19 +37,6 @@ function inferCourse(fileName: string, text: string) {
   return "待归类";
 }
 
-function inferLinkedNodeIds(text: string) {
-  const source = text.toLowerCase();
-  const nodeIds: string[] = [];
-  if (/极限/.test(source)) nodeIds.push("node-limits");
-  if (/连续/.test(source)) nodeIds.push("node-continuity");
-  if (/导数|瞬时变化率/.test(source)) nodeIds.push("node-derivative");
-  if (/罗尔/.test(source)) nodeIds.push("node-rolle");
-  if (/中值定理|平均变化率/.test(source)) nodeIds.push("node-mvt");
-  if (/柯西/.test(source)) nodeIds.push("node-cauchy");
-  if (/单调|估值|应用题|证明题/.test(source)) nodeIds.push("node-applications");
-  return Array.from(new Set(nodeIds));
-}
-
 function normalizeText(text: string) {
   return text.replace(/\r/g, "").replace(/\n{3,}/g, "\n\n").replace(/[ \t]{2,}/g, " ").trim();
 }
@@ -169,7 +156,8 @@ export async function parseLibraryFile(file: File): Promise<ParsedLibraryItemInp
     preview,
     summary: makeSummary(extractedText, file.name, type, parserStatus),
     highlights,
-    linkedNodeIds: inferLinkedNodeIds(`${file.name}\n${extractedText}`),
+    // 关联节点不再在解析阶段伪造；由 storage 在写入时基于真实知识图谱节点匹配。
+    linkedNodeIds: [],
     pageCount,
   };
 }

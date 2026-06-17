@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import clsx from "clsx";
-import { Columns, Plus, MessageSquare } from "lucide-react";
+import { Columns, Plus, MessageSquare, Sparkles } from "lucide-react";
 
 import { MessageList } from "../components/study/MessageList";
 import { StudyInput } from "../components/study/StudyInput";
@@ -224,20 +224,36 @@ export default function Study() {
             }}
           >
             <div className="qz-study-content">
-              <div className="qz-journey-bar select-none">
-                {journeySteps.map((step, index) => (
-                  <div
-                    key={step.key}
-                    className={clsx(
-                      "qz-journey-step",
-                      index < activeJourneyIndex && "qz-journey-step-done",
-                      index === activeJourneyIndex && "qz-journey-step-active"
-                    )}
+              <div className="flex items-center gap-3 select-none">
+                <div className="qz-journey-bar flex-1">
+                  {journeySteps.map((step, index) => (
+                    <div
+                      key={step.key}
+                      className={clsx(
+                        "qz-journey-step",
+                        index < activeJourneyIndex && "qz-journey-step-done",
+                        index === activeJourneyIndex && "qz-journey-step-active"
+                      )}
+                    >
+                      <span>{index + 1}</span>
+                      <strong>{step.label}</strong>
+                    </div>
+                  ))}
+                </div>
+                {session.canRunAgent ? (
+                  <motion.button
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    type="button"
+                    disabled={session.isGeneratingAnswer}
+                    onClick={() => void session.runLearningAgent()}
+                    className="shrink-0 inline-flex items-center gap-1.5 px-3 h-8 rounded-full border border-qz-primary/25 bg-qz-primary/8 text-qz-primary text-[12px] font-bold hover:bg-qz-primary/15 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="让学习 Agent 自动带你过一轮：讲核心 → 检查理解 → 小结下一步"
                   >
-                    <span>{index + 1}</span>
-                    <strong>{step.label}</strong>
-                  </div>
-                ))}
+                    <Sparkles size={13} />
+                    <span>Agent 带学一轮</span>
+                  </motion.button>
+                ) : null}
               </div>
               {session.messages.length === 0 ? (
                 <StudyEmptyState onSendPrompt={session.sendMessage} />

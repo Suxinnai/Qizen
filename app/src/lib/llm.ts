@@ -9,6 +9,8 @@ export interface GenerateStudyAnswerParams {
   selectedNodeLabel?: string;
   profileText: string;
   providerConfig: LlmProviderConfig;
+  /** 提供后启用真实 SSE 流式：每个增量 token 触发一次回调。 */
+  onToken?: (delta: string) => void;
 }
 
 export interface GenerateStudyAnswerResult {
@@ -118,8 +120,30 @@ function withTimeout(ms: number) {
   };
 }
 
+/** 逐行读取 SSE 响应体，对每个 `data:` 行回调一次（[DONE] 终止）。 */
+async function readSse(response: Response, onData: (data: string) => void) {
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("当前环境不支持流式响应");
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let newlineIndex: number;
+    while ((newlineIndex = buffer.indexOf("\n")) >= 0) {
+      const line = buffer.slice(0, newlineIndex).trim();
+      buffer = buffer.slice(newlineIndex + 1);
+      if (!line.startsWith("data:")) continue;
+      const data = line.slice(5).trim();
+      if (data === "[DONE]") return;
+      if (data) onData(data);
+    }
+  }
+}
+
 async function callOpenAiCompatible(params: GenerateStudyAnswerParams) {
-  const { providerConfig } = params;
+  const { providerConfig, onToken } = params;
   const timeout = withTimeout(REQUEST_TIMEOUT_MS);
   try {
     const baseUrl = (providerConfig.baseUrl || "https://api.openai.com/v1").replace(/\/$/, "");
@@ -132,6 +156,7 @@ async function callOpenAiCompatible(params: GenerateStudyAnswerParams) {
       body: JSON.stringify({
         model: providerConfig.model,
         temperature: 0.3,
+        stream: Boolean(onToken),
         messages: [
           { role: "system", content: buildSystemPrompt(params) },
           { role: "user", content: buildUserPrompt(params) },
@@ -143,6 +168,24 @@ async function callOpenAiCompatible(params: GenerateStudyAnswerParams) {
     if (!response.ok) {
       const errorText = await response.text().catch(() => "");
       throw new Error(errorText ? `请求失败（${response.status}）：${errorText}` : `请求失败（${response.status}）`);
+    }
+
+    if (onToken) {
+      let full = "";
+      await readSse(response, (data) => {
+        try {
+          const json = JSON.parse(data) as { choices?: Array<{ delta?: { content?: string } }> };
+          const delta = json.choices?.[0]?.delta?.content;
+          if (typeof delta === "string" && delta) {
+            full += delta;
+            onToken(delta);
+          }
+        } catch {
+          // 忽略心跳/非 JSON 行
+        }
+      });
+      if (!full.trim()) throw new Error("模型未返回有效内容");
+      return full;
     }
 
     const data = (await response.json()) as {
@@ -157,7 +200,7 @@ async function callOpenAiCompatible(params: GenerateStudyAnswerParams) {
 }
 
 async function callAnthropic(params: GenerateStudyAnswerParams) {
-  const { providerConfig } = params;
+  const { providerConfig, onToken } = params;
   const timeout = withTimeout(REQUEST_TIMEOUT_MS);
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -171,6 +214,7 @@ async function callAnthropic(params: GenerateStudyAnswerParams) {
         model: providerConfig.model,
         max_tokens: 900,
         temperature: 0.3,
+        stream: Boolean(onToken),
         system: buildSystemPrompt(params),
         messages: [{ role: "user", content: buildUserPrompt(params) }],
       }),
@@ -180,6 +224,26 @@ async function callAnthropic(params: GenerateStudyAnswerParams) {
     if (!response.ok) {
       const errorText = await response.text().catch(() => "");
       throw new Error(errorText ? `请求失败（${response.status}）：${errorText}` : `请求失败（${response.status}）`);
+    }
+
+    if (onToken) {
+      let full = "";
+      await readSse(response, (data) => {
+        try {
+          const json = JSON.parse(data) as { type?: string; delta?: { type?: string; text?: string } };
+          if (json.type === "content_block_delta" && json.delta?.type === "text_delta") {
+            const delta = json.delta.text;
+            if (typeof delta === "string" && delta) {
+              full += delta;
+              onToken(delta);
+            }
+          }
+        } catch {
+          // 忽略 ping/非文本事件
+        }
+      });
+      if (!full.trim()) throw new Error("模型未返回有效内容");
+      return full;
     }
 
     const data = (await response.json()) as {
