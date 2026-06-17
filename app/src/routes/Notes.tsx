@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { 
   Copy,
   Download, 
@@ -18,74 +18,160 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { addNote, loadAppData, updateNote } from "../lib/storage";
+import { EmptyState } from "../components/ui/EmptyState";
 
-// A beautiful lightweight Markdown Renderer
+// 行内格式：**粗体** / *斜体* / `行内代码`，把一行拆成 React 节点。
+function renderInline(text: string): ReactNode {
+  const nodes: ReactNode[] = [];
+  const regex = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g;
+  let lastIndex = 0;
+  let key = 0;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) nodes.push(text.slice(lastIndex, match.index));
+    const token = match[0];
+    if (token.startsWith("**")) {
+      nodes.push(
+        <strong key={key++} className="font-bold text-qz-text-strong dark:text-qz-text-dark">
+          {token.slice(2, -2)}
+        </strong>
+      );
+    } else if (token.startsWith("`")) {
+      nodes.push(
+        <code key={key++} className="px-1.5 py-0.5 rounded bg-black/[0.05] dark:bg-white/[0.08] font-mono text-[0.88em] text-qz-primary dark:text-qz-light">
+          {token.slice(1, -1)}
+        </code>
+      );
+    } else {
+      nodes.push(
+        <em key={key++} className="italic">
+          {token.slice(1, -1)}
+        </em>
+      );
+    }
+    lastIndex = match.index + token.length;
+  }
+  if (lastIndex < text.length) nodes.push(text.slice(lastIndex));
+  return nodes;
+}
+
+const HEADING_CLASS: Record<number, string> = {
+  1: "text-[26px] border-b border-qz-divider dark:border-qz-divider-dark pb-2.5 mt-6 mb-4",
+  2: "text-[20px] mt-5 mb-3",
+  3: "text-[17px] mt-4 mb-2.5",
+  4: "text-[15px] mt-3.5 mb-2",
+  5: "text-[14px] mt-3 mb-1.5",
+  6: "text-[13.5px] mt-3 mb-1.5",
+};
+
+// A beautiful lightweight Markdown Renderer（手写，无第三方依赖）
 function MarkdownRenderer({ content }: { content: string }) {
   const lines = content.split("\n");
-  
+  const blocks: ReactNode[] = [];
+  let i = 0;
+  let key = 0;
+
+  while (i < lines.length) {
+    const trimmed = lines[i].trim();
+
+    // 围栏代码块 ```
+    if (trimmed.startsWith("```")) {
+      const codeLines: string[] = [];
+      i += 1;
+      while (i < lines.length && !lines[i].trim().startsWith("```")) {
+        codeLines.push(lines[i]);
+        i += 1;
+      }
+      i += 1; // 跳过结尾 ```
+      blocks.push(
+        <pre key={key++} className="my-4 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] border border-black/5 dark:border-white/8 px-4 py-3 overflow-x-auto">
+          <code className="font-mono text-[12.5px] leading-6 text-qz-text-strong dark:text-qz-text-dark whitespace-pre">
+            {codeLines.join("\n")}
+          </code>
+        </pre>
+      );
+      continue;
+    }
+
+    // 分割线 ---
+    if (trimmed === "---") {
+      blocks.push(
+        <div key={key++} className="py-4">
+          <div className="border-t border-black/[0.06] dark:border-white/[0.08]" />
+        </div>
+      );
+      i += 1;
+      continue;
+    }
+
+    // 标题 #..######
+    const heading = trimmed.match(/^(#{1,6})\s+(.*)$/);
+    if (heading) {
+      const level = heading[1].length;
+      blocks.push(
+        <div key={key++} className={clsx("font-serif font-bold text-qz-text-strong dark:text-qz-text-dark leading-tight", HEADING_CLASS[level])}>
+          {renderInline(heading[2])}
+        </div>
+      );
+      i += 1;
+      continue;
+    }
+
+    // 引用 >
+    if (trimmed.startsWith("> ")) {
+      blocks.push(
+        <blockquote key={key++} className="border-l-4 border-qz-primary bg-qz-primary/[0.03] dark:bg-qz-primary/[0.06] rounded-r-lg px-4 py-3.5 italic text-[14.5px] leading-relaxed text-[#1A5C4A] dark:text-[#5BA593] my-4 shadow-[inset_1px_0_0_rgba(0,0,0,0.01)]">
+          {renderInline(trimmed.slice(2))}
+        </blockquote>
+      );
+      i += 1;
+      continue;
+    }
+
+    // 有序列表 1.
+    const ordered = trimmed.match(/^(\d+)\.\s+(.*)$/);
+    if (ordered) {
+      blocks.push(
+        <div key={key++} className="flex items-start gap-2.5 pl-2 text-[14px] leading-7 font-sans">
+          <span className="text-qz-primary dark:text-qz-light font-bold font-mono text-[13px] shrink-0 mt-0.5">{ordered[1]}.</span>
+          <span className="text-qz-text dark:text-qz-text-dark">{renderInline(ordered[2])}</span>
+        </div>
+      );
+      i += 1;
+      continue;
+    }
+
+    // 无序列表 - / *
+    if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+      blocks.push(
+        <div key={key++} className="flex items-start gap-2.5 pl-2 text-[14px] leading-7 font-sans">
+          <span className="w-1.5 h-1.5 rounded-full bg-qz-primary/60 dark:bg-qz-light/60 shrink-0 mt-2.5" />
+          <span className="text-qz-text dark:text-qz-text-dark">{renderInline(trimmed.slice(2))}</span>
+        </div>
+      );
+      i += 1;
+      continue;
+    }
+
+    // 空行
+    if (trimmed === "") {
+      blocks.push(<div key={key++} className="h-1.5" />);
+      i += 1;
+      continue;
+    }
+
+    // 普通段落
+    blocks.push(
+      <p key={key++} className="leading-7 font-sans text-[14.5px] text-qz-text dark:text-qz-text-dark">
+        {renderInline(trimmed)}
+      </p>
+    );
+    i += 1;
+  }
+
   return (
     <div className="font-serif leading-relaxed text-[15px] space-y-4 text-qz-text dark:text-qz-text-dark select-text selection:bg-qz-primary/10">
-      {lines.map((line, idx) => {
-        const trimmed = line.trim();
-        
-        // Horizontal Line: ---
-        if (trimmed === "---") {
-          return (
-            <div key={idx} className="py-4">
-              <div className="border-t border-black/[0.06] dark:border-white/[0.08]" />
-            </div>
-          );
-        }
-
-        // Header 1: # Header
-        if (trimmed.startsWith("# ")) {
-          return (
-            <h3 key={idx} className="font-serif text-[26px] font-bold text-qz-text-strong dark:text-qz-text-dark border-b border-qz-divider dark:border-qz-divider-dark pb-2.5 mt-6 mb-4 leading-tight">
-              {trimmed.slice(2)}
-            </h3>
-          );
-        }
-        
-        // Header 2: ## Header
-        if (trimmed.startsWith("## ")) {
-          return (
-            <h4 key={idx} className="font-serif text-[20px] font-bold text-qz-text-strong dark:text-qz-text-dark mt-5 mb-3 leading-tight">
-              {trimmed.slice(3)}
-            </h4>
-          );
-        }
-        
-        // Blockquote: > text
-        if (trimmed.startsWith("> ")) {
-          return (
-            <blockquote key={idx} className="border-l-4 border-qz-primary bg-qz-primary/[0.03] dark:bg-qz-primary/[0.06] rounded-r-lg px-4 py-3.5 italic text-[14.5px] leading-relaxed text-[#1A5C4A] dark:text-[#5BA593] my-4 shadow-[inset_1px_0_0_rgba(0,0,0,0.01)]">
-              {trimmed.slice(2)}
-            </blockquote>
-          );
-        }
-        
-        // Bullet lists: - item or * item
-        if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
-          return (
-            <div key={idx} className="flex items-start gap-2.5 pl-2 text-[14px] leading-7 font-sans">
-              <span className="w-1.5 h-1.5 rounded-full bg-qz-primary/60 dark:bg-qz-light/60 shrink-0 mt-2.5" />
-              <span className="text-qz-text dark:text-qz-text-dark">{trimmed.slice(2)}</span>
-            </div>
-          );
-        }
-        
-        // Empty space
-        if (trimmed === "") {
-          return <div key={idx} className="h-1.5" />;
-        }
-        
-        // Plain text paragraph
-        return (
-          <p key={idx} className="leading-7 font-sans text-[14.5px] text-qz-text dark:text-qz-text-dark">
-            {trimmed}
-          </p>
-        );
-      })}
+      {blocks}
     </div>
   );
 }
@@ -490,14 +576,17 @@ export default function Notes() {
 
             </div>
           ) : (
-            <div className="h-full flex flex-col items-center justify-center text-center text-qz-text-muted p-8 select-none">
-              <BookOpen size={30} className="mb-3 text-qz-light opacity-80" />
-              <div className="font-serif text-[18px] text-qz-primary mb-2">还没有笔记</div>
-              <p className="text-[12px] max-w-sm leading-relaxed mb-4">新建一篇笔记，或在学习空间开启自动写入笔记。</p>
-              <button type="button" onClick={handleCreateNote} className="qz-btn-primary h-9 px-4 text-[12px]">
-                新建笔记
-              </button>
-            </div>
+            <EmptyState
+              icon={BookOpen}
+              title="还没有笔记"
+              description="新建一篇笔记，或在学习空间开启自动写入笔记。"
+              dashed={false}
+              action={
+                <button type="button" onClick={handleCreateNote} className="qz-btn-primary h-9 px-4 text-[12px]">
+                  新建笔记
+                </button>
+              }
+            />
           )}
         </main>
 
