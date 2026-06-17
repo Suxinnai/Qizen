@@ -314,8 +314,15 @@ export default function Study() {
                   resourceLeads={session.resourceLeads}
                   practiceSet={session.practiceSet}
                   practiceHint={session.practiceHint}
+                  practiceAnswers={session.practiceAnswers}
+                  practiceResults={session.practiceResults}
+                  isGradingPractice={session.isGradingPractice}
+                  practiceGraded={session.practiceGraded}
+                  practiceSelfAssess={session.practiceSelfAssess}
                   onGeneratePractice={session.generatePracticeFromLatestRag}
-                  onCompletePractice={session.completeCurrentPracticeSet}
+                  onAnswerChange={session.setPracticeAnswer}
+                  onSubmitGrade={session.gradePracticeSet}
+                  onSelfVerdict={session.setPracticeSelfVerdict}
                   onSelectResource={session.selectResource}
                 />
               );

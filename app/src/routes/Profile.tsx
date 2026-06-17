@@ -291,14 +291,16 @@ export default function Profile() {
             <div className="rounded-[18px] border border-black/[0.05] dark:border-white/[0.08] px-4 py-4">
               <div className="flex items-center gap-2 mb-3 text-qz-text-muted">
                 <Target size={15} className="text-rose-500" />
-                <span className="text-[12px] font-medium">需巩固的点</span>
+                <span className="text-[12px] font-medium">{memory.hasGradedWeakPoints ? "常错点" : "需巩固的点"}</span>
               </div>
               {memory.weakPoints.length > 0 ? (
                 <div className="flex flex-wrap gap-1.5">
                   {memory.weakPoints.map((point) => (
                     <span
                       key={point.key}
-                      title={`${point.kind === "resource" ? "资料" : "主题"} · 出现 ${point.occurrences} 次`}
+                      title={`${
+                        point.kind === "practice" ? "练习答错" : point.kind === "resource" ? "资料" : "主题"
+                      } · 出现 ${point.occurrences} 次`}
                       className="text-[11px] px-2 py-1 rounded-full bg-rose-500/8 text-rose-700 dark:text-rose-300 border border-rose-500/15"
                     >
                       {point.key}
@@ -308,7 +310,7 @@ export default function Profile() {
                 </div>
               ) : (
                 <div className="text-[12px] text-qz-text-muted leading-6">
-                  反复涉及的资料或主题会聚到这里。多围绕同一主题提问后即可显现。
+                  练习判分答错的题、反复涉及的资料或主题会聚到这里。做完一组练习并提交批改后即可显现。
                 </div>
               )}
             </div>

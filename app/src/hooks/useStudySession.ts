@@ -25,7 +25,7 @@ import { buildAssistantReply, buildContextStudyPlan, isStudyPlanRequest } from "
 import { canAutoOpenPanel, getStudySessionStatus, shouldAllowLearningProgress } from "../lib/study/session-policy";
 import { inferLearnerLevel } from "../lib/study/adaptive";
 import { resolveLlmProviderConfig } from "../lib/secretStore";
-import { generateStudyAnswer, generateStudyConversationTitle, sanitizeLlmText } from "../lib/llm";
+import { generateStudyAnswer, generateStudyConversationTitle, gradePracticeAnswers, sanitizeLlmText, type PracticeGradeResult } from "../lib/llm";
 import { findLearningResources } from "../lib/webResourceAgent";
 import {
   buildStudyConversationTitle,
@@ -79,6 +79,11 @@ export function useStudySession(routeContext: StudyLocationState | null, routeCo
   const [latestRag, setLatestRag] = useState<LibraryRagResult | null>(null);
   const [practiceSet, setPracticeSet] = useState<RagPracticeSet | null>(null);
   const [practiceHint, setPracticeHint] = useState<string>("");
+  const [practiceAnswers, setPracticeAnswers] = useState<Record<string, string>>({});
+  const [practiceResults, setPracticeResults] = useState<Record<string, PracticeGradeResult> | null>(null);
+  const [isGradingPractice, setIsGradingPractice] = useState(false);
+  const [practiceGraded, setPracticeGraded] = useState(false);
+  const [practiceSelfAssess, setPracticeSelfAssess] = useState(false);
   const [isGeneratingAnswer, setIsGeneratingAnswer] = useState(false);
   const [journeyStage, setJourneyStage] = useState<StudyJourneyStage>("define");
   const [pendingPlanSteps, setPendingPlanSteps] = useState<StudyPlanStep[]>([]);
@@ -256,6 +261,11 @@ export function useStudySession(routeContext: StudyLocationState | null, routeCo
     setLatestRag(null);
     setPracticeSet(null);
     setPracticeHint("");
+    setPracticeAnswers({});
+    setPracticeResults(null);
+    setIsGradingPractice(false);
+    setPracticeGraded(false);
+    setPracticeSelfAssess(false);
     setJourneyStage(nextContext ? "learn" : "define");
     setPendingPlanSteps([]);
     setResourceLeads([]);
@@ -927,43 +937,120 @@ export function useStudySession(routeContext: StudyLocationState | null, routeCo
     });
     setStudyInteractionCount((prev) => prev + 1);
     setPracticeSet(nextPracticeSet);
+    setPracticeAnswers({});
+    setPracticeResults(null);
+    setPracticeGraded(false);
+    setPracticeSelfAssess(false);
     setPracticeHint(
-      `已按「${learnerLevel.difficulty}」难度生成 ${nextPracticeSet.questions.length} 道题（${learnerLevel.reason}）番茄钟已开始为本组练习计时。`
+      `已按「${learnerLevel.difficulty}」难度生成 ${nextPracticeSet.questions.length} 道题（${learnerLevel.reason}）作答后点「提交批改」。`
     );
     setPomodoroSeconds(totalSeconds);
     setPomodoroRunning(true);
     setActivePanel("resource");
   }
 
-  function completeCurrentPracticeSet() {
-    if (!practiceSet) return;
-    const persistedPractice = data.practiceSets.find(
-      (item) => item.title === practiceSet.title || item.title.includes(practiceSet.primaryTitle)
+  function setPracticeAnswer(id: string, value: string) {
+    setPracticeAnswers((prev) => ({ ...prev, [id]: value }));
+  }
+
+  function setPracticeSelfVerdict(id: string, verdict: PracticeGradeResult["verdict"]) {
+    setPracticeResults((prev) => ({ ...(prev ?? {}), [id]: { verdict, comment: "自评" } }));
+  }
+
+  function finalizePracticeGrading(
+    set: RagPracticeSet,
+    resultsMap: Record<string, PracticeGradeResult>,
+    llm: { usedRealModel: boolean; providerLabel: string; usedFallback: boolean }
+  ) {
+    const weight: Record<PracticeGradeResult["verdict"], number> = { 对: 1, 部分: 0.5, 错: 0 };
+    const score = set.questions.reduce((sum, q) => sum + (resultsMap[q.id] ? weight[resultsMap[q.id].verdict] : 0), 0);
+    const weakPrompts = set.questions
+      .filter((q) => resultsMap[q.id] && resultsMap[q.id].verdict !== "对")
+      .map((q) => q.prompt);
+
+    setPracticeResults(resultsMap);
+    setPracticeGraded(true);
+    setPracticeSelfAssess(false);
+
+    const persisted = data.practiceSets.find(
+      (item) => item.title === set.title || item.title.includes(set.primaryTitle)
     );
-    if (persistedPractice) {
-      const nextData = updatePracticeSetStatus(persistedPractice.id, "completed");
-      setData(nextData);
-    }
+    if (persisted) setData(updatePracticeSetStatus(persisted.id, "completed"));
+
     appendStudySessionEvent({
       id: `study-event-${Date.now()}`,
       type: "practice-completed",
       recordedAt: new Date().toISOString(),
-      question: latestRag?.query ?? practiceSet.primaryTitle,
+      question: latestRag?.query ?? set.primaryTitle,
       resourceId: selectedResource?.id ?? latestRag?.results[0]?.resource.id ?? null,
       nodeId: selectedNode?.id ?? null,
       taskId: conversationContext?.taskId ?? null,
-      hitResourceTitles: latestRag ? collectHitResourceTitles(latestRag) : practiceSet.basedOnTitles,
+      hitResourceTitles: latestRag ? collectHitResourceTitles(latestRag) : set.basedOnTitles,
       generatedPractice: false,
-      practiceScore: practiceSet.questions.length,
-      practiceQuestionCount: practiceSet.questions.length,
-      llm: {
-        usedRealModel: !(messages[messages.length - 1]?.usedFallback ?? true),
-        providerLabel: messages[messages.length - 1]?.providerLabel ?? "本地回答",
-        usedFallback: messages[messages.length - 1]?.usedFallback ?? true,
-      },
+      practiceScore: Math.round(score * 10) / 10,
+      practiceQuestionCount: set.questions.length,
+      weakQuestionPrompts: weakPrompts,
+      llm,
     });
     setStudyInteractionCount((prev) => prev + 1);
-    setPracticeHint(`已记录本组 ${practiceSet.questions.length} 道练习完成。`);
+
+    const scoreText = Number.isInteger(score) ? `${score}` : score.toFixed(1);
+    setPracticeHint(
+      `已记录批改结果：得分 ${scoreText} / ${set.questions.length}。${
+        weakPrompts.length ? `有 ${weakPrompts.length} 题需巩固，已计入常错点。` : "全部正确，很棒！"
+      }`
+    );
+  }
+
+  async function gradePracticeSet() {
+    if (!practiceSet || isGradingPractice || practiceGraded) return;
+    const set = practiceSet;
+    const providerConfig = await resolveLlmProviderConfig(data.settings.llm);
+    const hasModel =
+      providerConfig.provider !== "none" && Boolean(providerConfig.apiKey) && Boolean(providerConfig.model);
+
+    // 无模型：进入自评模式；首次点击仅展开自评 chips，再次点击据自评落库。
+    if (!hasModel) {
+      if (!practiceSelfAssess) {
+        setPracticeSelfAssess(true);
+        setPracticeHint("未配置模型，无法自动批改。请逐题自评后再点「记录自评结果」。");
+        return;
+      }
+      finalizePracticeGrading(set, practiceResults ?? {}, {
+        usedRealModel: false,
+        providerLabel: "本地自评",
+        usedFallback: true,
+      });
+      return;
+    }
+
+    setIsGradingPractice(true);
+    const items = set.questions.map((q) => ({
+      prompt: q.prompt,
+      type: q.type,
+      answerHint: q.answerHint,
+      evidenceSnippet: q.evidence?.sourceSnippet,
+      evidenceHighlights: q.evidence?.sourceHighlights,
+      userAnswer: practiceAnswers[q.id] ?? "",
+    }));
+    const grade = await gradePracticeAnswers({ items, providerConfig });
+    setIsGradingPractice(false);
+
+    if (grade.usedFallback || grade.results.length !== set.questions.length) {
+      setPracticeSelfAssess(true);
+      setPracticeHint(`自动批改不可用（${grade.errorSummary ?? "结果异常"}），请逐题自评后记录结果。`);
+      return;
+    }
+
+    const resultsMap: Record<string, PracticeGradeResult> = {};
+    set.questions.forEach((q, i) => {
+      resultsMap[q.id] = grade.results[i];
+    });
+    finalizePracticeGrading(set, resultsMap, {
+      usedRealModel: true,
+      providerLabel: grade.providerLabel,
+      usedFallback: false,
+    });
   }
 
   function handleNoteDraftChange(value: string) {
@@ -1028,6 +1115,11 @@ export function useStudySession(routeContext: StudyLocationState | null, routeCo
     latestRag,
     practiceSet,
     practiceHint,
+    practiceAnswers,
+    practiceResults,
+    isGradingPractice,
+    practiceGraded,
+    practiceSelfAssess,
     sessionStatus,
     journeyStage,
     pendingPlanSteps,
@@ -1050,7 +1142,9 @@ export function useStudySession(routeContext: StudyLocationState | null, routeCo
     handleUnderstood,
     saveMessageToNote,
     generatePracticeFromLatestRag,
-    completeCurrentPracticeSet,
+    setPracticeAnswer,
+    gradePracticeSet,
+    setPracticeSelfVerdict,
     handleNoteDraftChange,
     selectResource,
     selectNode,

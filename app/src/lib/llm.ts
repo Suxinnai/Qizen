@@ -291,6 +291,156 @@ export async function generateStudyAnswer(params: GenerateStudyAnswerParams): Pr
   }
 }
 
+export type PracticeVerdict = "对" | "部分" | "错";
+
+export interface PracticeGradeInput {
+  prompt: string;
+  type: string;
+  answerHint: string;
+  evidenceSnippet?: string;
+  evidenceHighlights?: string[];
+  userAnswer: string;
+}
+
+export interface PracticeGradeResult {
+  verdict: PracticeVerdict;
+  comment: string;
+}
+
+export interface GradePracticeAnswersResult {
+  results: PracticeGradeResult[];
+  usedFallback: boolean;
+  providerLabel: string;
+  errorSummary?: string;
+}
+
+function buildGradeSystemPrompt() {
+  return [
+    "你是一个严谨的学习批改助手。下面会给你若干道题，每道题包含题目、参考资料证据、以及学生的作答。",
+    "请只依据给出的资料证据和常识来判分，不要臆造资料里没有的内容。",
+    "对每道题给出一个结论：对 / 部分 / 错；并给一句简短中文点评（指出对在哪、缺什么或错在哪）。",
+    "若学生作答为空，judged 为“错”，点评提示其先作答。",
+    '严格只输出 JSON 数组，每个元素形如 {"index":0,"verdict":"对","comment":"…"}，verdict 只能是 对/部分/错 三者之一，不要输出 JSON 以外的任何文字。',
+  ].join("\n");
+}
+
+function buildGradeUserPrompt(items: PracticeGradeInput[]) {
+  const blocks = items.map((item, index) =>
+    [
+      `题目 ${index} 类型：${item.type}`,
+      `题目：${item.prompt}`,
+      `参考资料证据：${item.evidenceSnippet || "（无）"}`,
+      item.evidenceHighlights && item.evidenceHighlights.length > 0 ? `资料重点：${item.evidenceHighlights.join("；")}` : "",
+      `答题提示：${item.answerHint}`,
+      `学生作答：${item.userAnswer.trim() || "（未作答）"}`,
+    ]
+      .filter(Boolean)
+      .join("\n")
+  );
+  return [`共有 ${items.length} 道题，请逐题判分并按题号顺序返回 JSON 数组：`, blocks.join("\n\n")].join("\n\n");
+}
+
+function normalizeVerdict(value: unknown): PracticeVerdict {
+  if (value === "对" || value === "部分" || value === "错") return value;
+  const text = String(value ?? "");
+  if (text.includes("对") || /correct|right|true/i.test(text)) return "对";
+  if (text.includes("部分") || /partial/i.test(text)) return "部分";
+  return "错";
+}
+
+function parseGradeResults(raw: string, count: number): PracticeGradeResult[] | null {
+  const cleaned = raw
+    .replace(/```json/gi, "")
+    .replace(/```/g, "")
+    .trim();
+  const start = cleaned.indexOf("[");
+  const end = cleaned.lastIndexOf("]");
+  if (start < 0 || end <= start) return null;
+  try {
+    const parsed = JSON.parse(cleaned.slice(start, end + 1)) as Array<{ index?: number; verdict?: unknown; comment?: unknown }>;
+    if (!Array.isArray(parsed) || parsed.length === 0) return null;
+    const byIndex = new Map<number, PracticeGradeResult>();
+    parsed.forEach((item, order) => {
+      const idx = typeof item.index === "number" ? item.index : order;
+      byIndex.set(idx, {
+        verdict: normalizeVerdict(item.verdict),
+        comment: String(item.comment ?? "").trim() || "（无点评）",
+      });
+    });
+    return Array.from({ length: count }, (_, i) => byIndex.get(i) ?? { verdict: "错" as PracticeVerdict, comment: "未能解析该题批改结果。" });
+  } catch {
+    return null;
+  }
+}
+
+export async function gradePracticeAnswers(params: {
+  items: PracticeGradeInput[];
+  providerConfig: LlmProviderConfig;
+}): Promise<GradePracticeAnswersResult> {
+  const { items, providerConfig } = params;
+  const label = providerLabel(providerConfig);
+
+  if (!providerConfig || providerConfig.provider === "none" || !providerConfig.apiKey || !providerConfig.model) {
+    return { results: [], usedFallback: true, providerLabel: "本地回答", errorSummary: "未配置模型" };
+  }
+
+  const system = buildGradeSystemPrompt();
+  const user = buildGradeUserPrompt(items);
+  const timeout = withTimeout(REQUEST_TIMEOUT_MS);
+  try {
+    let raw: string;
+    if (providerConfig.provider === "anthropic") {
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-key": providerConfig.apiKey, "anthropic-version": "2023-06-01" },
+        body: JSON.stringify({
+          model: providerConfig.model,
+          max_tokens: 1000,
+          temperature: 0,
+          system,
+          messages: [{ role: "user", content: user }],
+        }),
+        signal: timeout.signal,
+      });
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => "");
+        throw new Error(errorText ? `请求失败（${response.status}）：${errorText}` : `请求失败（${response.status}）`);
+      }
+      const data = (await response.json()) as { content?: Array<{ type?: string; text?: string }> };
+      raw = data.content?.find((item) => item.type === "text")?.text?.trim() ?? "";
+    } else {
+      const baseUrl = (providerConfig.baseUrl || "https://api.openai.com/v1").replace(/\/$/, "");
+      const response = await fetch(`${baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${providerConfig.apiKey}` },
+        body: JSON.stringify({
+          model: providerConfig.model,
+          temperature: 0,
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: user },
+          ],
+        }),
+        signal: timeout.signal,
+      });
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => "");
+        throw new Error(errorText ? `请求失败（${response.status}）：${errorText}` : `请求失败（${response.status}）`);
+      }
+      const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
+      raw = data.choices?.[0]?.message?.content?.trim() ?? "";
+    }
+
+    const results = parseGradeResults(raw, items.length);
+    if (!results) throw new Error("模型返回的批改结果无法解析");
+    return { results, usedFallback: false, providerLabel: label };
+  } catch (error) {
+    return { results: [], usedFallback: true, providerLabel: label, errorSummary: getReadableLlmError(error) };
+  } finally {
+    timeout.clear();
+  }
+}
+
 export interface GenerateConversationTitleParams {
   providerConfig: LlmProviderConfig;
   selectedResourceTitle?: string;
