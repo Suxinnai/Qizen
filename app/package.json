@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "test:unit": "node --experimental-strip-types --test tests/study-policies.test.mjs tests/study-memory-rag-builders.test.mjs tests/study-conversation-context.test.mjs tests/sqlite-migration.test.mjs tests/sqlite-shadow-import.test.mjs tests/sqlite-shadow-verify.test.mjs",
+    "test:unit": "node --experimental-strip-types --test tests/study-policies.test.mjs tests/study-memory-rag-builders.test.mjs tests/study-conversation-context.test.mjs tests/sqlite-migration.test.mjs tests/sqlite-shadow-import.test.mjs tests/sqlite-shadow-verify.test.mjs tests/sqlite-cutover-verify.test.mjs",
     "verify:delivery": "node scripts/verify-delivery.cjs",
     "check:delivery": "node scripts/check-delivery.mjs",
     "smoke:resources": "node scripts/resource-agent-smoke.mjs",
@@ -24,7 +24,7 @@
     "mammoth": "^1.12.0",
     "pdfjs-dist": "^5.6.205",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0",
+    "react-dom": "^19.1.6",
     "react-router-dom": "^7.14.1",
     "tailwind-merge": "^3.5.0"
   },
