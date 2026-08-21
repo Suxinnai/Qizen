@@ -350,9 +350,16 @@ function PracticeStatsCard({
   events: { type: string }[];
   practiceSets: { status: string }[];
 }) {
-  const generated = events.filter((e) => e.type === "practice-generated").length;
-  const completed = events.filter((e) => e.type === "practice-completed").length + practiceSets.filter((p) => p.status === "completed").length;
-  const percentage = generated > 0 ? Math.round((completed / generated) * 100) : 0;
+  const generatedEvents = events.filter((e) => e.type === "practice-generated").length;
+  const completedEvents = events.filter((e) => e.type === "practice-completed").length;
+  const legacyCompletedSets = practiceSets.filter((p) => p.status === "completed").length;
+
+  // New study data records both the completion event and the persisted practice-set status.
+  // Treat completion events as the source of truth and use completed sets only for legacy data
+  // that predates event tracking, otherwise the same practice is counted twice.
+  const completed = completedEvents > 0 ? completedEvents : legacyCompletedSets;
+  const generated = Math.max(generatedEvents, completed);
+  const percentage = generated > 0 ? Math.min(100, Math.round((completed / generated) * 100)) : 0;
 
   // Dynamic feedback text
   const feedback = useMemo(() => {
