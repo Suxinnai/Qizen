@@ -23,6 +23,7 @@ run("unit tests", process.execPath, [
   "tests/sqlite-migration.test.mjs",
   "tests/sqlite-shadow-import.test.mjs",
   "tests/sqlite-shadow-verify.test.mjs",
+  "tests/sqlite-cutover-verify.test.mjs",
 ]);
 run("typescript", process.execPath, ["node_modules/typescript/bin/tsc", "--noEmit"]);
 run("production build", process.execPath, ["node_modules/vite/bin/vite.js", "build"]);
