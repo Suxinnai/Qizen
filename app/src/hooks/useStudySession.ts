@@ -5,7 +5,6 @@ import {
   loadAppData,
   modeLabel,
   toggleTask,
-  updatePracticeSetStatus,
   updateNote,
   addNote,
   addLearningPlanGoal,
@@ -14,18 +13,15 @@ import {
   type LlmProviderConfig,
 } from "../lib/storage";
 import {
-  createPracticeSetFromRagResult,
   retrieveRelevantLibraryContext,
   type LibraryRagResult,
-  type RagPracticeSet,
 } from "../lib/rag";
 import { isNonLearningChat, shouldSearchKnowledgeBase } from "../lib/study/intent";
 import { collectHitResourceTitles, createEmptyRag, getStrongRag } from "../lib/study/rag-policy";
 import { buildAssistantReply, buildContextStudyPlan, isStudyPlanRequest } from "../lib/study/reply-policy";
 import { canAutoOpenPanel, getStudySessionStatus, shouldAllowLearningProgress } from "../lib/study/session-policy";
-import { inferLearnerLevel } from "../lib/study/adaptive";
 import { resolveLlmProviderConfig } from "../lib/secretStore";
-import { generateStudyAnswer, generateStudyConversationTitle, gradePracticeAnswers, sanitizeLlmText, type PracticeGradeResult } from "../lib/llm";
+import { generateStudyAnswer, generateStudyConversationTitle, sanitizeLlmText } from "../lib/llm";
 import { findLearningResources } from "../lib/webResourceAgent";
 import type { PersistedStudyConversation } from "../lib/studyConversations";
 import { getStudyTree, flattenTasks, buildInitialMessages } from "../lib/study/study-helpers";
@@ -42,6 +38,7 @@ import {
 import type { ChatMessage, PanelKey, StudyJourneyStage, StudyLocationState, StudyPlanStep, StudyResourceLead } from "../lib/study/types";
 import { useStudyConversationPersistence } from "./useStudyConversationPersistence";
 import { useStudyPomodoro } from "./useStudyPomodoro";
+import { useStudyPractice } from "./useStudyPractice";
 
 const STREAM_CHUNK_SIZE = 8;
 const STREAM_DELAY_MS = 14;
@@ -67,13 +64,6 @@ export function useStudySession(routeContext: StudyLocationState | null, routeCo
   const [activePanel, setActivePanel] = useState<PanelKey | null>(null);
   const [autoTriggered, setAutoTriggered] = useState<Set<string>>(new Set());
   const [latestRag, setLatestRag] = useState<LibraryRagResult | null>(null);
-  const [practiceSet, setPracticeSet] = useState<RagPracticeSet | null>(null);
-  const [practiceHint, setPracticeHint] = useState<string>("");
-  const [practiceAnswers, setPracticeAnswers] = useState<Record<string, string>>({});
-  const [practiceResults, setPracticeResults] = useState<Record<string, PracticeGradeResult> | null>(null);
-  const [isGradingPractice, setIsGradingPractice] = useState(false);
-  const [practiceGraded, setPracticeGraded] = useState(false);
-  const [practiceSelfAssess, setPracticeSelfAssess] = useState(false);
   const [isGeneratingAnswer, setIsGeneratingAnswer] = useState(false);
   const [journeyStage, setJourneyStage] = useState<StudyJourneyStage>("define");
   const [pendingPlanSteps, setPendingPlanSteps] = useState<StudyPlanStep[]>([]);
@@ -124,6 +114,35 @@ export function useStudySession(routeContext: StudyLocationState | null, routeCo
     : selectedNote
     ? selectedNote.title
     : selectedTask?.title ?? "当前任务";
+  const {
+    practiceSet,
+    practiceHint,
+    practiceAnswers,
+    practiceResults,
+    isGradingPractice,
+    practiceGraded,
+    practiceSelfAssess,
+    clearCurrentPractice,
+    resetPracticeState,
+    generatePracticeFromLatestRag,
+    setPracticeAnswer,
+    gradePracticeSet,
+    setPracticeSelfVerdict,
+  } = useStudyPractice({
+    data,
+    latestRag,
+    selectedResourceId: selectedResource?.id,
+    selectedNodeId: selectedNode?.id,
+    taskId: conversationContext?.taskId,
+    lastMessage: messages[messages.length - 1],
+    onDataChange: setData,
+    onInteractionRecorded: () => setStudyInteractionCount((prev) => prev + 1),
+    onOpenResourcePanel: () => setActivePanel("resource"),
+    onStartPomodoro: () => {
+      setPomodoroSeconds(totalSeconds);
+      setPomodoroRunning(true);
+    },
+  });
   const { conversationTitle, setConversationTitle, persistCurrentConversation } =
     useStudyConversationPersistence({
       messages,
@@ -202,13 +221,7 @@ export function useStudySession(routeContext: StudyLocationState | null, routeCo
     setSelectedTaskId(nextTaskId);
     setMessages(buildInitialMessages(teachingStyle, nextResource?.title, nextNode?.label, true));
     setLatestRag(null);
-    setPracticeSet(null);
-    setPracticeHint("");
-    setPracticeAnswers({});
-    setPracticeResults(null);
-    setIsGradingPractice(false);
-    setPracticeGraded(false);
-    setPracticeSelfAssess(false);
+    resetPracticeState();
     setJourneyStage(nextContext ? "learn" : "define");
     setPendingPlanSteps([]);
     setResourceLeads([]);
@@ -229,8 +242,7 @@ export function useStudySession(routeContext: StudyLocationState | null, routeCo
     setNoteDraft(conversation.noteDraft);
     setInput("");
     setLatestRag(null);
-    setPracticeSet(null);
-    setPracticeHint("");
+    clearCurrentPractice();
     setJourneyStage(conversation.messages.some((message) => message.kind === "plan") ? "plan" : "learn");
     setPendingPlanSteps(
       (conversation.messages.find((message) => message.planSteps?.length)?.planSteps as StudyPlanStep[] | undefined) ?? []
@@ -432,8 +444,7 @@ export function useStudySession(routeContext: StudyLocationState | null, routeCo
     const userMessage: ChatMessage = { id: "u-" + Date.now(), role: "user", content: text };
     setMessages((prev) => [...prev, userMessage]);
     setLatestRag(hasHits ? rag : null);
-    setPracticeSet(null);
-    setPracticeHint("");
+    clearCurrentPractice();
     if (!overrideText) setInput("");
     setIsGeneratingAnswer(true);
 
@@ -797,155 +808,6 @@ export function useStudySession(routeContext: StudyLocationState | null, routeCo
     } finally {
       setIsGeneratingAnswer(false);
     }
-  }
-
-  function generatePracticeFromLatestRag() {
-    if (!latestRag || latestRag.results.length === 0) {
-      setPracticeSet(null);
-      setPracticeHint("请先提一个问题，或先选择资料，让系统先完成一次命中检索。");
-      setActivePanel("resource");
-      return;
-    }
-
-    const learnerLevel = inferLearnerLevel(data.studyRecord.events);
-    const nextPracticeSet = createPracticeSetFromRagResult(latestRag, learnerLevel.difficulty);
-    if (!nextPracticeSet) {
-      setPracticeHint("当前命中资料还不足以生成质量稳定的题目，请换一个更具体的问题再试。");
-      return;
-    }
-
-    appendStudySessionEvent({
-      id: `study-event-${Date.now()}`,
-      type: "practice-generated",
-      recordedAt: new Date().toISOString(),
-      question: latestRag.query,
-      resourceId: selectedResource?.id ?? latestRag.results[0]?.resource.id ?? null,
-      nodeId: selectedNode?.id ?? null,
-      taskId: conversationContext?.taskId ?? null,
-      hitResourceTitles: collectHitResourceTitles(latestRag),
-      generatedPractice: true,
-      llm: {
-        usedRealModel: !(messages[messages.length - 1]?.usedFallback ?? true),
-        providerLabel: messages[messages.length - 1]?.providerLabel ?? "本地回答",
-        usedFallback: messages[messages.length - 1]?.usedFallback ?? true,
-      },
-    });
-    setStudyInteractionCount((prev) => prev + 1);
-    setPracticeSet(nextPracticeSet);
-    setPracticeAnswers({});
-    setPracticeResults(null);
-    setPracticeGraded(false);
-    setPracticeSelfAssess(false);
-    setPracticeHint(
-      `已按「${learnerLevel.difficulty}」难度生成 ${nextPracticeSet.questions.length} 道题（${learnerLevel.reason}）作答后点「提交批改」。`
-    );
-    setPomodoroSeconds(totalSeconds);
-    setPomodoroRunning(true);
-    setActivePanel("resource");
-  }
-
-  function setPracticeAnswer(id: string, value: string) {
-    setPracticeAnswers((prev) => ({ ...prev, [id]: value }));
-  }
-
-  function setPracticeSelfVerdict(id: string, verdict: PracticeGradeResult["verdict"]) {
-    setPracticeResults((prev) => ({ ...(prev ?? {}), [id]: { verdict, comment: "自评" } }));
-  }
-
-  function finalizePracticeGrading(
-    set: RagPracticeSet,
-    resultsMap: Record<string, PracticeGradeResult>,
-    llm: { usedRealModel: boolean; providerLabel: string; usedFallback: boolean }
-  ) {
-    const weight: Record<PracticeGradeResult["verdict"], number> = { 对: 1, 部分: 0.5, 错: 0 };
-    const score = set.questions.reduce((sum, q) => sum + (resultsMap[q.id] ? weight[resultsMap[q.id].verdict] : 0), 0);
-    const weakPrompts = set.questions
-      .filter((q) => resultsMap[q.id] && resultsMap[q.id].verdict !== "对")
-      .map((q) => q.prompt);
-
-    setPracticeResults(resultsMap);
-    setPracticeGraded(true);
-    setPracticeSelfAssess(false);
-
-    const persisted = data.practiceSets.find(
-      (item) => item.title === set.title || item.title.includes(set.primaryTitle)
-    );
-    if (persisted) setData(updatePracticeSetStatus(persisted.id, "completed"));
-
-    appendStudySessionEvent({
-      id: `study-event-${Date.now()}`,
-      type: "practice-completed",
-      recordedAt: new Date().toISOString(),
-      question: latestRag?.query ?? set.primaryTitle,
-      resourceId: selectedResource?.id ?? latestRag?.results[0]?.resource.id ?? null,
-      nodeId: selectedNode?.id ?? null,
-      taskId: conversationContext?.taskId ?? null,
-      hitResourceTitles: latestRag ? collectHitResourceTitles(latestRag) : set.basedOnTitles,
-      generatedPractice: false,
-      practiceScore: Math.round(score * 10) / 10,
-      practiceQuestionCount: set.questions.length,
-      weakQuestionPrompts: weakPrompts,
-      llm,
-    });
-    setStudyInteractionCount((prev) => prev + 1);
-
-    const scoreText = Number.isInteger(score) ? `${score}` : score.toFixed(1);
-    setPracticeHint(
-      `已记录批改结果：得分 ${scoreText} / ${set.questions.length}。${
-        weakPrompts.length ? `有 ${weakPrompts.length} 题需巩固，已计入常错点。` : "全部正确，很棒！"
-      }`
-    );
-  }
-
-  async function gradePracticeSet() {
-    if (!practiceSet || isGradingPractice || practiceGraded) return;
-    const set = practiceSet;
-    const providerConfig = await resolveLlmProviderConfig(data.settings.llm);
-    const hasModel =
-      providerConfig.provider !== "none" && Boolean(providerConfig.apiKey) && Boolean(providerConfig.model);
-
-    // 无模型：进入自评模式；首次点击仅展开自评 chips，再次点击据自评落库。
-    if (!hasModel) {
-      if (!practiceSelfAssess) {
-        setPracticeSelfAssess(true);
-        setPracticeHint("未配置模型，无法自动批改。请逐题自评后再点「记录自评结果」。");
-        return;
-      }
-      finalizePracticeGrading(set, practiceResults ?? {}, {
-        usedRealModel: false,
-        providerLabel: "本地自评",
-        usedFallback: true,
-      });
-      return;
-    }
-
-    setIsGradingPractice(true);
-    const items = set.questions.map((q) => ({
-      prompt: q.prompt,
-      type: q.type,
-      answerHint: q.answerHint,
-      evidenceSnippet: q.evidence?.sourceSnippet,
-      evidenceHighlights: q.evidence?.sourceHighlights,
-      userAnswer: practiceAnswers[q.id] ?? "",
-    }));
-    const grade = await gradePracticeAnswers({ items, providerConfig });
-    setIsGradingPractice(false);
-
-    if (grade.usedFallback || grade.results.length !== set.questions.length) {
-      setPracticeSelfAssess(true);
-      setPracticeHint(`自动批改不可用（${grade.errorSummary ?? "结果异常"}），请逐题自评后记录结果。`);
-      return;
-    }
-
-    const resultsMap: Record<string, PracticeGradeResult> = {};
-    set.questions.forEach((q, i) => {
-      resultsMap[q.id] = grade.results[i];
-    });
-    finalizePracticeGrading(set, resultsMap, {
-      usedRealModel: true,
-      providerLabel: grade.providerLabel,
-      usedFallback: false,
-    });
   }
 
   function handleNoteDraftChange(value: string) {
