@@ -8,7 +8,7 @@ Qizen 不是题库、网课聚合器，也不是单纯给聊天模型套一层�
 
 当前产品的核心目标是：**把用户自己的资料、学习目标、知识图谱、历史学习记录与真实大模型能力串成一个长期可积累的学习闭环。**
 
-目前主产品形态是 Windows / 桌面优先的 Electron 应用，核心技术栈为：
+主产品形态是 Windows / 桌面优先的 Electron 应用，核心技术栈：
 
 - Electron
 - React 19
@@ -18,70 +18,69 @@ Qizen 不是题库、网课聚合器，也不是单纯给聊天模型套一层�
 - Framer Motion
 - Lucide React
 
-当前代码已经超过概念 Demo 阶段，属于 **可运行 MVP / 产品化整理阶段**。后续重点不应继续无节制堆功能，而应优先收敛数据层、会话编排、测试与发布能力。
+当前阶段：**可运行 MVP → 产品化稳定阶段**。
+
+> 本 README 以 2026-08-21 当前 `master` 源码为准。历史 PRD、roadmap、prototype 与源码冲突时，以源码为准。
 
 ---
 
-## 当前真实状态（按 `master` 代码审计，更新于 2026-08-21）
+## 当前真实能力
 
-> 本节以当前 `master` 源码为准，不以旧 PRD / 路线图中的计划描述为准。
-
-### 已形成的核心学习闭环
-
-当前 Study 主链路已经可以覆盖：
+### 核心学习闭环
 
 ```text
 明确学习内容
 → 讨论学习方式
 → 生成并确认学习计划
-→ 查找在线资源 + 融合本地资料
+→ 在线资源发现 + 本地资料融合
 → RAG 检索本地依据
-→ 调用真实 LLM / 本地 fallback
-→ 流式回答
+→ 真实 LLM / 本地 fallback
+→ SSE 流式回答
 → 基于命中资料生成练习
 → 用户作答
-→ LLM 批改 / 无模型自评降级
-→ 写入学习记录与薄弱点
-→ 在 Profile / Reports 中反馈
+→ LLM 批改 / 无模型自评
+→ 写入学习事件与薄弱点
+→ Profile / Reports 反馈
 ```
 
-### 已实现功能概览
+### 功能状态
 
-| 模块 | 当前状态 | 真实实现说明 |
+| 模块 | 状态 | 当前真实实现 |
 | --- | --- | --- |
-| Electron 桌面壳 | ✅ 已实现 | 自定义无边框窗口、最小化/最大化/关闭、外链打开、Electron smoke test |
-| Onboarding | ✅ 已实现 | 8 题 VARK 风格学习偏好评测，本地保存主/辅学习模式与教学策略 |
-| Dashboard | ✅ 已实现 | 今日提问、练习、学习分钟、连续学习、目标任务、最近 30 天节奏 |
-| Goals | ✅ 基础可用 | goal → milestone → task 层级，支持从 task 进入 Study |
-| Library | ✅ 核心可用 | PDF / DOCX / Markdown / TXT 文本解析；图片可收纳但不做 OCR 深解析 |
-| Library 摘要/重点 | ✅ 已实现（规则型） | 当前摘要与重点由本地文本规则提取，不是 LLM 摘要 |
-| Knowledge Graph | ✅ 核心可用 | 资料解析后启发式生成节点/边；支持缩放、拖拽、节点详情与学习入口 |
-| Notes | ✅ 基础可用 | Markdown 编辑/预览、学习空间写入、要点/易混淆点、复制全文 |
-| Study 会话 | ✅ 核心可用 | 新建/切换/持久化、上下文进入、流式回答、RAG、策略按钮、右侧工具面板 |
-| 本地 RAG | ✅ 已实现 | 关键词 + CJK 2–4gram + IDF + 当前资料/节点 boost；不是向量检索 |
-| LLM | ✅ 已实现 | OpenAI-compatible + Anthropic；支持真实 SSE 流式输出与连接测试 |
-| Resource Agent | ✅ MVP | Wikipedia / 中文 Wikipedia / Wikibooks / DuckDuckGo 发现资源，失败时降级搜索入口 |
-| Learning Agent | ✅ MVP | 固定三步“讲解 → 检查理解 → 小结下一步”，不是通用工具调用 Agent |
-| Adaptive Practice | ✅ 已实现 | 根据历史提问/练习完成情况推断基础 / 进阶 / 综合，调整题量和题型 |
-| Practice Grading | ✅ 已实现 | 有模型时整组 LLM 批改；无模型时允许用户自评；记录真实分数与错题 |
-| Learner Memory | ✅ MVP | 从学习事件派生连续学习、常错/需巩固点、模型使用占比、主要 Provider |
-| Reports | ✅ 已增强 | 7 天柱状图、30 天热力图、资料命中 Top 5、练习完成率、模型使用占比、事件时间线 |
-| Profile | ✅ 已增强 | 昵称、VARK 雷达图、学习记忆、统计、最近活动、重新评测 |
-| 数据导出 | ✅ 已实现 | 导出当前主 AppData JSON |
-| 会话清理 / 全量重置 | ✅ 已实现 | 可单独清理 Study 会话；可重置主数据 |
-| 账号体系 / 云同步 | ❌ 未实现 | 当前是本地单用户产品 |
-| 系统通知 / 成就 | ❌ 未实现 | 暂无真正通知调度、成就引擎 |
-| 安装包 / 自动更新 | ❌ 未实现 | 目前没有 electron-builder / forge / updater / 签名发布链 |
+| Electron 桌面壳 | ✅ | 无边框窗口、窗口控制、外链拦截、Electron smoke |
+| Onboarding | ✅ | VARK 风格学习偏好评测，含四维预览与本地画像保存 |
+| Dashboard | ✅ | 今日提问、练习、学习分钟、目标任务、30 天节奏 |
+| Goals | ✅ 基础可用 | goal → milestone → task，可从任务进入 Study |
+| Library | ✅ 核心可用 | PDF / DOCX / Markdown / TXT 解析；图片可收纳但不做 OCR 深解析 |
+| Library 摘要/重点 | ✅ 规则型 | 当前主要由本地文本规则提取，不是 LLM 摘要 |
+| Knowledge Graph | ✅ 核心可用 | 启发式生成节点/边、缩放拖拽、节点详情、学习入口 |
+| Notes | ✅ | Markdown 编辑/预览，支持 H1-H6、列表、引用、围栏代码、粗体/斜体/行内代码 |
+| Study 会话 | ✅ 核心可用 | 新建/切换/持久化、上下文进入、流式回答、RAG、工具面板 |
+| 本地 RAG | ✅ | 关键词 + CJK 2–4gram + IDF + resource/node boost；不是向量检索 |
+| LLM | ✅ | OpenAI-compatible + Anthropic；SSE 流式输出、连接测试 |
+| Resource Agent | ✅ MVP | Wikipedia / 中文 Wikipedia / Wikibooks / DuckDuckGo；失败降级搜索入口 |
+| Resource 搜索缓存 | ✅ | `searchCacheHours` 控制成功在线结果缓存，本地 Library lead 每次保持实时 |
+| Learning Agent | ✅ MVP | 固定三步“讲解 → 检查理解 → 小结下一步”，不是通用工具 Agent |
+| Adaptive Practice | ✅ | 根据历史学习事件推断基础 / 进阶 / 综合难度 |
+| Practice Grading | ✅ | 有模型时 LLM 批改；无模型时自评；记录分数与薄弱题 |
+| Learner Memory | ✅ MVP | 连续学习、常错点、模型使用、主要 Provider 等派生记忆 |
+| Reports | ✅ / ⚠️ | 图表与时间线已实现；练习完成统计存在一个已确认双计数 bug，见下文 |
+| Profile | ✅ | 昵称、VARK 雷达图、学习记忆、统计、最近活动、重新评测 |
+| Settings | ✅ 基础可用 | 模型、自动行为、RAG、缓存、数据等配置；部分字段仍未消费 |
+| API Key 存储 | ✅ Electron | 使用 Electron `safeStorage`；旧明文 secret 可自动迁移 |
+| GitHub Actions CI | ✅ | Windows 上自动执行 contract + TypeScript + Vite build + Electron smoke |
+| 数据导出 | ✅ | 导出主 AppData JSON |
+| 账号体系 / 云同步 | ❌ | 当前是本地单用户产品 |
+| 系统通知 / 成就 | ❌ | 暂无真正通知调度、成就引擎 |
+| 安装包 / 自动更新 | ❌ | 尚无 installer、签名、updater、Release 发布链 |
 
 ---
 
-## 核心模块说明
+## 核心架构
 
-### 1. Study 学习空间
+### Study 学习空间
 
-Study 是当前产品核心。
-
-`app/src/routes/Study.tsx` 已经从早期巨型页面拆成 UI 编排层，主要依赖：
+Study 是产品核心。页面已经从早期巨型组件拆成 UI 编排层，但复杂业务仍主要集中在 Hook：
 
 ```text
 app/src/routes/Study.tsx
@@ -94,13 +93,13 @@ app/src/lib/study/
 当前支持：
 
 - 自由新会话
-- 从 Library / Graph / Goal / Note 带上下文进入
+- Library / Graph / Goal / Note 上下文进入
 - 历史会话恢复
-- 会话标题生成
+- 自动会话标题
 - `<think>` / `<thinking>` / `<thought>` 清洗
 - 非学习闲聊绕开 RAG
-- 强证据门槛控制
-- OpenAI / Anthropic 真实流式输出
+- 强证据门槛
+- OpenAI / Anthropic 实时流式输出
 - 本地 fallback
 - 学习计划生成与确认
 - Resource Agent
@@ -108,58 +107,60 @@ app/src/lib/study/
 - 番茄钟
 - 选中文字保存笔记
 - 学习路线面板
-- Agent 带学一轮
+- 三步 Learning Agent
 - 自适应练习
 - LLM 批改 / 自评降级
 
-### 2. RAG 实现边界
+### RAG 当前边界
 
-当前 RAG 不是 embedding / vector database。
-
-核心实现位于：
+核心文件：
 
 ```text
 app/src/lib/rag.ts
 app/src/lib/study/rag-policy.ts
 ```
 
-检索主要使用：
+当前检索使用：
 
 - 文本 normalize
 - ASCII token
 - 中文 2–4 字 n-gram
-- 小规模 IDF 加权
-- 通用学习意图同义词
-- 从用户资料自动派生的词组扩展
+- 小规模 IDF
+- 通用学习意图词扩展
+- 从用户资料派生词组
 - 当前 resource boost
 - 当前 graph node boost
 - 标题 / 摘要 / highlights / preview / 正文分字段加权
 
-证据展示还会经过第二层强命中过滤，因此“检索到”不等于“展示为证据”。
+它不是 embedding / vector database。证据展示还会经过强命中过滤，因此“检索到”不等于“展示为证据”。
 
-### 3. 在线资源发现
+### Resource Agent 当前边界
 
-`app/src/lib/webResourceAgent.ts` 当前做的是 **资源发现**，不是网页内容抓取 Agent。
+核心文件：
 
-当前会并行尝试：
+```text
+app/src/lib/webResourceAgent.ts
+```
+
+当前并行尝试：
 
 - 中文 Wikipedia OpenSearch
 - Wikipedia OpenSearch
 - Wikibooks OpenSearch
 - DuckDuckGo Instant Answer
 
-拿不到结果时，会生成 Bing 可点击搜索入口。
+成功在线结果会根据 `searchCacheHours` 缓存；缓存只保存在线 lead，当前本地资料标题仍在每次调用时重新融合。
 
-当前不会：
+当前**不会**：
 
-- 自动打开并解析任意网页全文
-- 自动抓 Bilibili / YouTube 视频目录
-- 自动理解网页正文后写入 Library
-- 做浏览器自动化工具调用
+- 自动抓取任意网页全文
+- 自动拉取 Bilibili / YouTube 课程目录
+- 自动把网页正文写入 Library
+- 浏览器自动化工具调用
 
-### 4. 练习与长期学习记忆
+因此请把它理解为“资源发现 Agent”，不是“网页研究 Agent”。
 
-当前已经有第一版学习反馈闭环：
+### 练习与学习记忆
 
 ```text
 RAG 命中
@@ -173,21 +174,15 @@ RAG 命中
 → Profile / Reports
 ```
 
-难度推断当前采用简单规则：
-
-- 基础：默认起点
-- 进阶：完成 ≥2 组练习或累计提问较多
-- 综合：稳定完成多组练习且完成率较高
-
-这仍属于 MVP 级自适应，不是知识追踪模型 / IRT / BKT。
+当前自适应仍是规则型 MVP，不是 IRT / BKT / 知识追踪模型。
 
 ---
 
-## 当前数据与持久化
+## 数据与持久化
 
 ### 主数据
 
-主 AppData 使用浏览器 `localStorage`：
+当前主 AppData 仍使用浏览器 `localStorage`：
 
 ```text
 qizen:mvp:v2
@@ -208,57 +203,55 @@ qizen:mvp:v2
 
 ### Study 会话
 
-会话单独存储：
+会话独立存储：
 
 ```text
 qizen:study:conversations:v1
 ```
 
-当前已有 schema migration / 文本清洗逻辑，但仍然属于 localStorage 持久化。
+已经有 schema migration / 文本清洗逻辑，但仍属于 localStorage 持久化。
 
 ### API Key
 
-Electron 环境下 API Key 已从主 AppData 中分离：
+Electron 环境下，API Key 不写入主 AppData，而是通过主进程 secret IPC 写入：
 
 ```text
-Electron userData/secrets/secrets.json
+Electron userData/secrets/<key>.secret
 ```
 
-说明：
+当前行为：
 
-- Electron 运行时不会把 API Key 写回主 AppData localStorage。
-- 浏览器单独运行前端时，secretStore 会 fallback 到独立 localStorage key。
-- **当前 secret 文件不是系统 Keychain / Windows Credential Manager / DPAPI 加密存储。**
-
-因此 UI 中不应宣称“本地加密存储”已经完成。
+- 系统加密能力可用时，使用 Electron `safeStorage.encryptString()` 写入密文。
+- 读取时使用 `safeStorage.decryptString()`。
+- 旧版本明文 `.secret` 首次成功读取后会自动迁移成加密格式。
+- 如果当前 OS / 运行环境没有可用的 safeStorage 加密能力，会保持可用性并使用明文 fallback，不伪装成已加密。
+- 浏览器单独运行前端时，`secretStore` 仍有独立 localStorage fallback，因此浏览器模式不等同于 Electron 的系统级安全存储。
 
 ---
 
-## 设置项接入状态
-
-Settings 中有一部分字段是真实接入，一部分目前只是保存配置。
+## Settings 接入状态
 
 | 设置 | 状态 | 说明 |
 | --- | --- | --- |
-| username | ✅ 已接入 | Dashboard / Profile / Sidebar 使用 |
-| llm.provider | ✅ 已接入 | 控制 OpenAI-compatible / Anthropic |
-| llm.baseUrl | ✅ 已接入 | OpenAI-compatible 请求地址 |
-| llm.model | ✅ 已接入 | 主模型 ID |
-| API Key | ✅ 已接入 | secretStore 保存并用于请求 |
-| autoStartPomodoro | ✅ 已接入 | Study 工具面板自动行为 |
-| autoOpenStudyPanels | ✅ 已接入 | 控制工具面板自动打开 |
-| autoAppendNote | ✅ 已接入 | Study 自动笔记行为 |
-| autoGenerateSessionTitle | ✅ 已接入 | 会话标题生成 |
-| pomodoroMinutes | ✅ 已接入 | Study 番茄钟 |
-| ragSimilarityThreshold | ✅ 部分接入 | 被换算为当前关键词 RAG 分数门槛；名称“相似度”并不准确 |
-| contextWindowRounds | ⚠️ 仅保存 | 当前 LLM 请求没有真正按多轮历史构造 messages |
-| searchCacheHours | ⚠️ 仅保存 | Resource Agent 当前没有缓存实现 |
-| requireTerminalConfirmation | ⚠️ 仅保存 | 当前产品没有 run_terminal 工具链 |
-| autoSummarizeSessionNote | ⚠️ 未消费 | 数据字段存在，但没有完整执行链路 |
-| autoUpdateLearningProfile | ⚠️ 未消费 | 当前学习画像不会依据练习结果自动增量更新 |
+| username | ✅ | Dashboard / Profile / Sidebar 使用 |
+| llm.provider | ✅ | OpenAI-compatible / Anthropic |
+| llm.baseUrl | ✅ | OpenAI-compatible 请求地址 |
+| llm.model | ✅ | 主模型 ID |
+| API Key | ✅ | Electron safeStorage / 浏览器 fallback |
+| autoStartPomodoro | ✅ | Study 自动行为 |
+| autoOpenStudyPanels | ✅ | 控制工具面板自动打开 |
+| autoAppendNote | ✅ | Study 自动笔记 |
+| autoGenerateSessionTitle | ✅ | 会话标题生成 |
+| pomodoroMinutes | ✅ | Study 番茄钟 |
+| ragSimilarityThreshold | ✅ 部分接入 | 被换算为关键词 RAG 分数门槛；“相似度”命名并不准确 |
+| searchCacheHours | ✅ | 控制 Resource Agent 成功在线结果缓存时长 |
+| contextWindowRounds | ⚠️ 仅保存 | 当前 LLM 请求没有真正按 N 轮历史构造 messages |
+| requireTerminalConfirmation | ⚠️ 仅保存 | 当前没有 run_terminal 工具链 |
+| autoSummarizeSessionNote | ⚠️ 未消费 | 字段存在，没有完整执行链路 |
+| autoUpdateLearningProfile | ⚠️ 未消费 | 练习结果不会自动增量更新 VARK 画像 |
 | remindersEnabled | ⚠️ 未消费 | 尚无通知调度系统 |
 
-后续新增设置时，必须保证：**UI 暴露 ≠ 已实现；只有被业务逻辑真实消费后才标为“已接入”。**
+原则：**UI 暴露 ≠ 已实现。只有被业务逻辑真实消费后，README 才标记为“已接入”。**
 
 ---
 
@@ -266,22 +259,26 @@ Settings 中有一部分字段是真实接入，一部分目前只是保存配�
 
 ```text
 Qizen/
+├─ .github/
+│  └─ workflows/
+│     └─ ci.yml                     # Windows delivery CI
 ├─ README.md
-├─ CLAUDE.md                         # AI/协作开发约定与架构注意事项
+├─ CLAUDE.md                        # AI/协作开发约定
 ├─ app/
 │  ├─ electron/
-│  │  ├─ main.cjs                   # Electron 主进程 / 窗口 / secret IPC / smoke
-│  │  ├─ preload.cjs                # contextBridge
-│  │  └─ dev.cjs                    # Electron + Vite 开发启动
+│  │  ├─ main.cjs                  # 窗口 / safeStorage secret / Electron smoke
+│  │  ├─ preload.cjs               # contextBridge
+│  │  └─ dev.cjs                   # Electron + Vite 开发启动
 │  ├─ scripts/
-│  │  ├─ check-delivery.mjs         # 字符串/契约存在性检查
-│  │  ├─ verify-delivery.cjs        # 类型检查 + build + Electron smoke 等组合验证
-│  │  ├─ resource-agent-smoke.mjs   # 在线资源发现 smoke
-│  │  └─ visual-smoke.cjs           # 浏览器/Electron 截图视觉 smoke
+│  │  ├─ check-delivery.mjs        # 字符串/契约存在性检查
+│  │  ├─ verify-delivery.cjs       # contract + tsc + build + Electron smoke
+│  │  ├─ resource-agent-smoke.mjs  # 在线资源发现 smoke
+│  │  └─ visual-smoke.cjs          # 视觉 smoke
 │  ├─ src/
 │  │  ├─ components/
-│  │  │  ├─ Sidebar.tsx
-│  │  │  ├─ TitleBar.tsx
+│  │  │  ├─ ui/
+│  │  │  │  ├─ EmptyState.tsx
+│  │  │  │  └─ Switch.tsx
 │  │  │  └─ study/
 │  │  │     ├─ MessageList.tsx
 │  │  │     ├─ MessageBody.tsx
@@ -292,25 +289,16 @@ Qizen/
 │  │  │     ├─ PracticePanel.tsx
 │  │  │     └─ panels/
 │  │  ├─ hooks/
-│  │  │  └─ useStudySession.ts      # 当前最复杂的核心会话编排
+│  │  │  └─ useStudySession.ts     # 当前最复杂的核心会话编排
 │  │  ├─ lib/
-│  │  │  ├─ storage.ts              # 主数据模型 + localStorage + 数据操作
-│  │  │  ├─ studyConversations.ts   # Study 会话持久化/迁移
-│  │  │  ├─ library-parser.ts       # PDF / DOCX / MD / TXT 解析
-│  │  │  ├─ rag.ts                  # 本地关键词 RAG + 练习生成
-│  │  │  ├─ llm.ts                  # OpenAI-compatible / Anthropic + SSE
-│  │  │  ├─ secretStore.ts          # API Key 分离存储
-│  │  │  ├─ webResourceAgent.ts     # 公共搜索源资源发现
+│  │  │  ├─ storage.ts             # 主数据模型 + localStorage
+│  │  │  ├─ studyConversations.ts  # 会话持久化 / migration
+│  │  │  ├─ library-parser.ts
+│  │  │  ├─ rag.ts
+│  │  │  ├─ llm.ts
+│  │  │  ├─ secretStore.ts
+│  │  │  ├─ webResourceAgent.ts
 │  │  │  └─ study/
-│  │  │     ├─ intent.ts
-│  │  │     ├─ rag-policy.ts
-│  │  │     ├─ reply-policy.ts
-│  │  │     ├─ sanitize.ts
-│  │  │     ├─ session-policy.ts
-│  │  │     ├─ message-builders.ts
-│  │  │     ├─ adaptive.ts
-│  │  │     ├─ memory.ts
-│  │  │     └─ types.ts
 │  │  └─ routes/
 │  │     ├─ Onboarding.tsx
 │  │     ├─ Dashboard.tsx
@@ -323,104 +311,156 @@ Qizen/
 │  │     ├─ Profile.tsx
 │  │     └─ Settings.tsx
 │  ├─ package.json
+│  ├─ pnpm-lock.yaml
 │  └─ vite.config.ts
 ├─ docs/
 ├─ design/
 ├─ planning/
-└─ prototype/                        # 历史原型，不代表当前产品实现
+└─ prototype/                       # 历史原型，不代表当前实现
 ```
 
 ---
 
 ## 开发与验证
 
-### 环境
+### 推荐环境
 
-- Node.js
-- pnpm
-- Windows / Electron 开发环境
+- Node.js 22
+- pnpm 9.15.9（当前 CI 固定版本）
+- Windows / Electron
 
-前端 dev server 固定使用：
-
-```text
-127.0.0.1:1420
-```
+> 当前 lockfile + Electron 安装链在 pnpm 10 下会遇到 dependency build scripts 默认被阻止的问题。CI 暂时固定 pnpm 9.15.9。未来升级 pnpm 10+ 时，应显式配置允许的 Electron / esbuild build dependencies，而不是盲目放开所有依赖脚本。
 
 ### 安装
 
 ```powershell
 cd app
-pnpm install
+pnpm install --frozen-lockfile
 ```
 
-### Electron 开发
+### 开发
 
 ```powershell
 pnpm electron:dev
 ```
 
-### 仅前端
+仅前端：
 
 ```powershell
 pnpm dev
 ```
 
-### 类型检查
+### 验证
 
-项目历史上出现过 `npx tsc` 误装错误包的问题，因此优先：
-
-```powershell
-.\node_modules\.bin\tsc --noEmit
-```
-
-或：
+类型检查：
 
 ```powershell
 pnpm exec tsc --noEmit
 ```
 
-### 生产构建
+生产构建：
 
 ```powershell
 pnpm build
 ```
 
-### Electron smoke
+Electron smoke：
 
 ```powershell
 pnpm electron:check
 ```
 
-### 组合交付检查
+组合交付检查：
 
 ```powershell
 pnpm verify:delivery
 ```
 
-注意：
+当前 `verify:delivery` 实际执行：
 
-- `check-delivery.mjs` 主要是字符串 / 契约存在性检查，不是行为测试。
-- `verify-delivery.cjs` 会组合类型检查、构建和 Electron smoke，但仍不能替代真实交互测试。
-- 在线资源 smoke 和视觉 smoke 需要单独执行。
+```text
+check-delivery contract checks
+→ TypeScript tsc --noEmit
+→ Vite production build
+→ Electron smoke
+```
+
+注意：`check-delivery.mjs` 主要是字符串 / 契约存在性检查，不是行为测试；CI 全绿也不能替代真实交互测试。
+
+在线资源 smoke 与视觉 smoke 仍需按需单独执行：
 
 ```powershell
 pnpm smoke:resources -- calculus
 pnpm smoke:visual
 ```
 
+### GitHub Actions
+
+`.github/workflows/ci.yml` 在以下场景自动执行：
+
+- PR → `master`
+- push → `master`
+
+当前 CI：
+
+```text
+windows-latest
+Node 22
+pnpm 9.15.9
+pnpm install --frozen-lockfile
+pnpm verify:delivery
+```
+
+外部网络资源 smoke 不作为 required CI，以避免公共 API 网络波动造成 flaky failure。
+
 ---
 
-## 已知技术债与优先级
+## 已知问题与技术债
 
-### P0 / 下一阶段必须优先处理
+### P0 — 稳定性 / 数据正确性
 
-#### 1. 拆 `useStudySession.ts`
+#### 1. Reports 练习完成统计重复计数（已确认 bug）
 
-当前 `Study.tsx` 已经明显变轻，但复杂度迁移到了 `app/src/hooks/useStudySession.ts`。
+`PracticeStatsCard` 当前同时把以下两者相加：
 
-目前会话切换、水合、持久化、RAG、LLM、Agent、计划、Resource Agent、练习、批改、番茄钟、笔记、进度写回仍集中在一个 Hook 中，并使用多个 ref 协调时序。
+```text
+practice-completed events
++
+practiceSets.status === completed
+```
 
-建议拆分方向：
+而练习批改完成时，现有逻辑会同时：
+
+1. 把对应 practice set 标为 `completed`
+2. 写入 `practice-completed` event
+
+因此同一练习可能被计算两次，完成率甚至可能超过 100%。
+
+修复原则：
+
+- `practice-completed` event 作为新数据的主要真源。
+- `practiceSets.status` 仅用于旧数据兼容 fallback。
+- 完成率强制限制在 0–100%。
+- 后续最好给练习事件增加稳定 `practiceSetId`，从数据模型上支持去重。
+
+#### 2. 拆 `useStudySession.ts`
+
+`Study.tsx` 已经变轻，但复杂度集中到了 `app/src/hooks/useStudySession.ts`。
+
+当前一个 Hook 同时负责：
+
+- 会话切换 / 水合 / 持久化
+- RAG
+- LLM 流式生成
+- 学习计划
+- Resource Agent
+- Learning Agent
+- 练习生成 / 批改
+- 番茄钟
+- 笔记
+- 进度写回
+
+建议拆分：
 
 ```text
 useStudyConversation
@@ -434,77 +474,68 @@ useStudyProgress
 
 并逐步用 reducer / state machine 收敛状态转换。
 
-#### 2. localStorage → SQLite
+#### 3. localStorage → SQLite
 
-当前资料、学习事件、知识图谱、目标和报告数据仍全部放在 localStorage。
+当前资料、学习事件、知识图谱、目标和报告数据仍依赖 localStorage。
 
-当真实用户开始积累大量资料、对话和事件后，这会成为容量、查询、迁移和可靠性瓶颈。
-
-建议正式引入：
+下一阶段应设计：
 
 ```text
-SQLite + migration layer
+SQLite
++ schema migration
++ localStorage import migration
 ```
 
-Drizzle 可作为 ORM 方案候选，但应先设计 schema / migration / import-existing-localStorage。
+Drizzle 可以作为候选 ORM，但先设计数据边界再选实现。
 
-#### 3. 补正式自动化测试
+### P1 — 测试 / 发布 / 核心能力
 
-当前没有 Vitest / React Testing Library / Playwright。
+#### 4. 正式自动化测试
+
+现在已经有 CI，但仍没有 Vitest / React Testing Library / Playwright。
 
 优先补：
 
-- `rag.ts` 纯函数测试
-- `adaptive.ts` 测试
-- `memory.ts` 测试
-- `intent.ts` / `rag-policy.ts` 测试
-- Study 会话恢复 / 新建 / 切换测试
-- LLM JSON 批改防御性解析测试
-- Library 上传解析回归测试
+- `rag.ts`
+- `adaptive.ts`
+- `memory.ts`
+- `intent.ts` / `rag-policy.ts`
+- Reports 指标计算
+- Study 会话恢复 / 新建 / 切换
+- LLM 批改 JSON 防御性解析
+- Library 上传解析回归
 
-#### 4. 桌面产品发布链
+#### 5. LLM 多轮上下文
 
-目前只能开发运行 / preview / smoke，没有：
+`contextWindowRounds` 目前仍未真正进入模型请求。
+
+需要正式设计：
+
+```text
+最近 N 轮会话
++ 当前 query
++ 当前 RAG 证据
++ token budget
++ 隐私边界
+```
+
+并同时兼容 OpenAI-compatible 与 Anthropic message 格式。
+
+#### 6. 桌面产品发布链
+
+当前缺少：
 
 - installer
 - electron-builder / forge
 - Windows code signing
 - auto updater
-- release workflow
+- GitHub Release workflow
 
-要进入真实用户测试，必须补这一层。
+进入外部用户测试前必须补齐。
 
-### P1 / 明确功能缺口
+#### 7. RAG 升级
 
-#### 5. LLM 多轮上下文
-
-Settings 有 `contextWindowRounds`，但当前核心生成请求仍然主要围绕“当前 query + 当前 RAG/上下文”构造，没有真正把 N 轮聊天历史传给模型。
-
-需要把会话历史正式纳入 prompt/messages，同时控制 token 与隐私边界。
-
-#### 6. Resource Agent 缓存
-
-Settings 有 `searchCacheHours`，但当前没有资源检索缓存。
-
-建议后续增加：
-
-```text
-query + locale + source → cached result + fetchedAt
-```
-
-#### 7. API Key 系统安全存储
-
-当前 Electron secret file 只是“从主 localStorage 分离”，不等于加密。
-
-Windows 上可考虑：
-
-- DPAPI
-- Credential Manager
-- keytar / Electron safeStorage
-
-#### 8. RAG 升级
-
-当前关键词 RAG 对小型个人资料库足够，但后续可以升级：
+当前关键词 RAG 对小型个人资料库足够，后续可逐步升级：
 
 - chunk 索引
 - embedding
@@ -512,60 +543,63 @@ Windows 上可考虑：
 - rerank
 - source citation schema
 
-不要直接替换现有实现，应保留 fallback 与可解释性。
+升级时应保留当前可解释 fallback。
 
-### P2 / 清理与一致性
+### P2 — 产品一致性
 
-#### 9. 清理遗留数据模型
+#### 8. 清理未消费 Settings
 
-`app/src/lib/storage/types.ts` 存在一套与当前 `storage.ts` 不一致的旧 RootStore / TeachingStyle 定义，当前未发现真实业务引用，应确认后删除或归档。
+仍需决定“实现还是移除 UI”：
 
-#### 10. 去除剩余学科硬编码
+- `requireTerminalConfirmation`
+- `autoSummarizeSessionNote`
+- `autoUpdateLearningProfile`
+- `remindersEnabled`
 
-虽然核心 RAG 已经去掉早期微积分硬编码，但仍存在少量 UI / 推断规则残留，例如：
+#### 9. 修正文案超前
 
-- `StudyEmptyState.tsx` 的快捷提示仍写有“数学定理”
-- Goals UI 对“数学 / 英语 / 编程”有固定主题样式
-- Knowledge Graph 节点 kind 推断仍包含定理/概念类启发式规则
+仍需继续核对：
 
-通用学习产品应继续去领域化。
+- Library 把规则摘要描述成“AI 智能分析”的文案
+- Library 关于练习自动更新学习画像的文案
+- 其它“AI / 自动化 / 隐私”描述是否与真实能力一致
 
-#### 11. 修正文案超前问题
+---
 
-当前部分 UI 文案比真实实现更激进，例如：
+## 已在 2026-08-21 完成的稳定化工作
 
-- Onboarding 宣称“本地加密隐私”，实际主数据是 localStorage，secret 也只是文件分离
-- Library 把规则摘要称为“AI 智能分析”
-- Library 宣称练习会自动更新学习画像，但当前并没有这条增量更新链路
-
-后续任何产品文案都应和实现保持一致。
-
-#### 12. Reports 练习完成统计口径
-
-当前 Reports 的 completed 统计同时读取 `practice-completed` event 和 `practiceSets.status === completed`，需要检查是否存在重复计数场景，并统一数据真源。
+- ✅ 补 GitHub Actions Windows CI
+- ✅ 发现并解决 pnpm 10 阻止 Electron / esbuild postinstall 导致 CI smoke 失败的问题；当前 CI 固定 pnpm 9.15.9
+- ✅ Electron API Key 使用 `safeStorage` 系统级加密，兼容旧明文 secret 自动迁移
+- ✅ Electron smoke 增加真实 secret round-trip / 密文检查
+- ✅ `searchCacheHours` 正式接入 Resource Agent
+- ✅ Resource Agent 只缓存成功在线结果，本地资料融合保持实时
+- ✅ 删除无引用旧 `storage/types.ts`
+- ✅ 去掉 Study 空状态“数学定理”学科硬编码
+- ✅ 合并 Notes Markdown / Settings Switch / EmptyState / Onboarding VARK UI polish
 
 ---
 
 ## 建议后续开发顺序
 
 ```text
-1. 合并 / 处理现有 UI polish PR
-2. 拆 useStudySession + 收敛会话状态
-3. 补 Vitest / Study 关键行为测试
-4. 设计 SQLite schema 与 localStorage 迁移
-5. 修复 Settings 假接入项和产品文案超前
-6. 完成 Windows 安装包 / Release 流程
-7. 正式实现多轮上下文
+1. 修复 Reports 练习完成双计数
+2. 拆 useStudySession，收敛会话状态
+3. 补正式单元 / 集成 / E2E 测试
+4. 设计 SQLite schema 与 localStorage migration
+5. 清理未消费 Settings 与超前产品文案
+6. 完成 Windows installer / signing / Release
+7. 正式实现 contextWindowRounds 多轮上下文
 8. 再升级 Resource Agent / RAG / Agent 工具体系
 ```
 
-当前阶段不建议继续大规模增加新页面。
+当前不建议继续大规模增加页面。
 
-**最重要的是先把已经存在的能力变成稳定、可测试、可迁移、可发布的产品。**
+**最重要的是把已经存在的能力变成稳定、可测试、可迁移、可发布的产品。**
 
 ---
 
-## 当前信息架构
+## 信息架构
 
 ```text
 Qizen
@@ -598,7 +632,7 @@ Qizen
 
 - [`CLAUDE.md`](./CLAUDE.md) — 构建、验证、架构约定与已知技术债
 
-### 产品 / 设计历史文档
+### 产品 / 设计历史
 
 - [`docs/PRD.md`](./docs/PRD.md)
 - [`docs/FINAL_PRODUCT_MASTER_SPEC_2026-04-24.md`](./docs/FINAL_PRODUCT_MASTER_SPEC_2026-04-24.md)
@@ -606,27 +640,21 @@ Qizen
 - [`docs/TECH_STACK.md`](./docs/TECH_STACK.md)
 - [`design/PRODUCT_DESIGN.md`](./design/PRODUCT_DESIGN.md)
 
-### 交付与路线历史
+### 交付 / 路线历史
 
 - [`docs/DELIVERY_AUDIT.md`](./docs/DELIVERY_AUDIT.md)
 - [`planning/PROJECT_STATUS_AND_ROADMAP_2026-04-24.md`](./planning/PROJECT_STATUS_AND_ROADMAP_2026-04-24.md)
 - [`planning/WEEK_1_SPRINT.md`](./planning/WEEK_1_SPRINT.md)
 
-> 上述旧文档保留历史决策价值，但若与本 README 和当前源码冲突，以当前源码为准。
+这些文档保留历史决策价值；与本 README 或当前源码冲突时，以当前源码为准。
 
 ---
 
-## 项目原则
+## 开发原则
 
-后续开发建议继续遵守：
-
-1. **代码事实高于产品文案。**
-2. **先修闭环与可信度，再加新功能。**
-3. **通用逻辑禁止写死单一学科知识。**
-4. **RAG 没有强依据就不展示成证据。**
-5. **模型输出进入 UI / 持久化前必须清洗。**
-6. **新增 Settings 必须区分“仅保存”与“真实接入”。**
-7. **每次核心改动必须至少通过 TypeScript、build 和对应行为测试。**
-8. **长期数据能力优先考虑迁移、兼容与可恢复性。**
-
-由「灵」和使用者一起，把 Qizen 从可运行 MVP 继续养成真正可以长期使用的个人学习系统。
+1. **代码事实优先于规划文档。**
+2. **UI 有开关，不等于功能已经接入。**
+3. **AI 文案必须与真实模型调用链一致。**
+4. **用户学习数据与 secret 分开管理。**
+5. **任何核心状态重构都必须先补可验证边界。**
+6. **新增功能前优先修正确性、迁移、测试和发布能力。**
