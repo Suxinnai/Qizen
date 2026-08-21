@@ -37,6 +37,7 @@ Qizen 不是题库、网课聚合器，也不是给聊天模型简单套一层�
 → 在线资源发现 + 本地资料融合
 → RAG 检索本地依据
 → 真实 LLM / 本地 fallback
+→ 最近 N 轮会话上下文
 → SSE 流式回答
 → 基于命中资料生成练习
 → 用户作答
@@ -58,6 +59,7 @@ Qizen 不是题库、网课聚合器，也不是给聊天模型简单套一层�
 | Knowledge Graph | ✅ 核心可用 | 启发式节点/边、缩放拖拽、节点详情、Study 入口 |
 | Notes | ✅ | Markdown 编辑/预览，支持标题、列表、引用、代码、粗体/斜体 |
 | Study 会话 | ✅ 核心可用 | 新建/切换/持久化、上下文进入、流式回答、RAG、工具面板 |
+| 多轮上下文 | ✅ 主对话 | `contextWindowRounds` 控制最近 N 个用户轮次；12,000 字符总预算；长消息压缩 |
 | 本地 RAG | ✅ | 关键词 + CJK 2–4gram + IDF + resource/node boost；不是向量检索 |
 | LLM | ✅ | OpenAI-compatible + Anthropic；SSE 流式输出、连接测试 |
 | Resource Agent | ✅ MVP | Wikipedia / 中文 Wikipedia / Wikibooks / DuckDuckGo；失败降级搜索入口 |
@@ -68,10 +70,10 @@ Qizen 不是题库、网课聚合器，也不是给聊天模型简单套一层�
 | Learner Memory | ✅ MVP | 连续学习、真实常错点、重复巩固点、模型使用、主要 Provider |
 | Reports | ✅ | 图表与时间线；练习完成统计已去重并兼容旧数据，完成率限制 0–100% |
 | Profile | ✅ | 昵称、VARK 雷达图、学习记忆、统计、最近活动、重新评测 |
-| Settings | ✅ 基础可用 | 模型、自动行为、RAG、缓存、数据等配置；部分字段仍未消费 |
+| Settings | ✅ 基础可用 | 模型、自动行为、RAG、缓存、上下文、数据等配置；部分字段仍未消费 |
 | API Key 存储 | ✅ Electron | Electron `safeStorage`；旧明文 secret 自动迁移；无系统加密能力时诚实 fallback |
 | GitHub Actions CI | ✅ | Windows 自动执行 contract + unit tests + TypeScript + Vite build + Electron smoke |
-| 行为单元测试 | ✅ 基线 | Node 22 `node:test`，当前两套 Study 策略测试共 21 个 test case |
+| 行为单元测试 | ✅ 基线 | Node 22 `node:test`，当前 3 套 Study 测试共 28 个 test case |
 | 数据导出 | ✅ | 导出主 AppData JSON |
 | 账号体系 / 云同步 | ❌ | 当前是本地单用户产品 |
 | 系统通知 / 成就 | ❌ | 暂无真正通知调度、成就引擎 |
@@ -81,7 +83,7 @@ Qizen 不是题库、网课聚合器，也不是给聊天模型简单套一层�
 
 ## Study 当前架构
 
-`Study.tsx` 现在主要承担 UI 编排，核心状态已开始按职责拆分。
+`Study.tsx` 主要承担 UI 编排，核心状态已经按职责拆分。
 
 ```text
 app/src/routes/Study.tsx
@@ -91,6 +93,7 @@ app/src/routes/Study.tsx
    └─ useStudyPractice.ts                        # 出题 / 作答 / 批改 / weak points
 
 app/src/lib/study/
+├─ conversation-context.ts                       # 最近 N 轮历史 / 字符预算 / 模型 query 拼接
 ├─ intent.ts
 ├─ rag-policy.ts
 ├─ reply-policy.ts
@@ -107,6 +110,7 @@ app/src/lib/study/
 - 输入与消息流
 - RAG 调用和证据状态
 - OpenAI / Anthropic 实时流式生成
+- 多轮历史接线
 - 本地 fallback
 - AI 会话标题
 - 学习计划确认
@@ -122,7 +126,39 @@ app/src/lib/study/
 - ✅ 会话 persistence / hydration
 - ✅ Practice 生命周期与 grading
 
-因此当前方向不是继续“为了拆而拆”，而是优先给现有边界增加测试，再决定是否抽 Generation / Agent。
+当前不继续为了 Hook 数量机械拆分；下一步优先增强测试和数据层。
+
+---
+
+## 多轮上下文
+
+核心文件：
+
+```text
+app/src/lib/study/conversation-context.ts
+app/src/hooks/useStudySession.ts
+```
+
+`contextWindowRounds` 已真实接入 Study 主对话模型请求。
+
+当前语义：
+
+- 1 轮 = 1 条 user 消息开始，到下一条 user 消息前的所有 assistant 消息。
+- Settings 当前允许 6–20 轮，默认 10。
+- 总历史字符预算：12,000。
+- 单条历史消息超过约 3,000 字符时保留头部 + 尾部。
+- 预算从最新消息向旧消息裁剪，不保留孤立的 assistant 历史。
+- 历史和“当前问题”在模型 query 中明确分区。
+
+边界：
+
+- **RAG 检索仍只使用当前原始问题。**
+- **学习事件 / Reports / Memory 仍记录当前原始问题。**
+- **本地 fallback 仍基于当前原始问题。**
+- Learning Agent 内部三步仍是任务型独立 prompt，不继承普通聊天历史。
+- 当前实现是把历史块注入现有 model user prompt，而不是重写 Provider 为原生多条 message 数组。
+
+这个设计优先保证现有 OpenAI-compatible / Anthropic 流式链路稳定；未来若要进一步优化 token 管理，可再升级为 provider-native message history。
 
 ---
 
@@ -153,7 +189,7 @@ app/src/lib/study/rag-policy.ts
 - 后续 result：score ≥ 12
 - `rag.sufficient === false` 时不展示证据
 
-这些边界已经有 `node:test` 行为测试。
+这些边界已有 `node:test` 行为测试。
 
 它仍然不是 embedding / vector database。
 
@@ -281,7 +317,7 @@ Electron userData/secrets/<key>.secret
 | pomodoroMinutes | ✅ | `useStudyPomodoro` |
 | ragSimilarityThreshold | ✅ 部分接入 | 换算为关键词 RAG 分数门槛；“相似度”命名并不准确 |
 | searchCacheHours | ✅ | Resource Agent 在线结果缓存 |
-| contextWindowRounds | ⚠️ 仅保存 | LLM 请求尚未真正按最近 N 轮历史构造 messages |
+| contextWindowRounds | ✅ 主对话 | 最近 N 个用户轮次 + 12,000 字符预算；不污染 RAG / event question |
 | requireTerminalConfirmation | ⚠️ 仅保存 | 当前没有 run_terminal 工具链 |
 | autoSummarizeSessionNote | ⚠️ 未消费 | 没有完整执行链路 |
 | autoUpdateLearningProfile | ⚠️ 未消费 | 练习结果不会增量更新 VARK 画像 |
@@ -310,7 +346,8 @@ Qizen/
 │  │  └─ visual-smoke.cjs
 │  ├─ tests/
 │  │  ├─ study-policies.test.mjs
-│  │  └─ study-memory-rag-builders.test.mjs
+│  │  ├─ study-memory-rag-builders.test.mjs
+│  │  └─ study-conversation-context.test.mjs
 │  ├─ src/
 │  │  ├─ hooks/
 │  │  │  ├─ useStudySession.ts
@@ -386,7 +423,7 @@ pnpm test:unit
 
 当前使用 Node 22 内置 `node:test`，显式开启 TypeScript type stripping，不额外引入 Vitest/Jest。
 
-当前测试重点：
+当前 3 套 suite 共 28 个 test case，重点覆盖：
 
 - Adaptive Practice 难度边界
 - intent / RAG 入口策略
@@ -397,6 +434,9 @@ pnpm test:unit
 - Learner Memory
 - learning topic / plan confirmation / Resource Agent intent
 - plan step 结构
+- conversation history 轮数语义
+- history 字符预算 / 超长消息压缩
+- contextual model query 的历史/当前问题分区
 
 ### 类型检查
 
@@ -432,7 +472,7 @@ check-delivery contract checks
 → Electron smoke
 ```
 
-`check-delivery.mjs` 仍然是字符串 / 契约存在性检查，不是行为测试；真正行为边界逐步迁移到 `node:test`。
+`check-delivery.mjs` 仍然是字符串 / 契约存在性检查，不是行为测试；真正行为边界逐步迁移到 `node:test`。当前 contract 也会验证 `contextWindowRounds` 确实接在主模型调用链上。
 
 在线资源与视觉 smoke 仍需按需单独执行：
 
@@ -512,21 +552,16 @@ secret 继续独立于主学习数据库。
 
 后续如果需要 DOM / Hook 测试，再引入 Vitest + React Testing Library；不要为了“有测试框架”而先加依赖。
 
-#### 3. LLM 多轮上下文
+#### 3. 多轮上下文下一阶段优化
 
-`contextWindowRounds` 仍未真正进入模型请求。
+`contextWindowRounds` 已接入主对话，但当前实现仍有可升级点：
 
-正式实现应包含：
+- 字符预算未来可升级为真实 token budget。
+- Provider 可升级为原生多条 message history，而不是单 user prompt 中的历史块。
+- 可根据模型 context window 动态调整预算。
+- Learning Agent 是否继承会话历史应单独设计，不应默认混用。
 
-```text
-最近 N 轮会话
-+ 当前 query
-+ 当前 RAG 证据
-+ token budget
-+ 隐私边界
-```
-
-并兼容 OpenAI-compatible 与 Anthropic 消息格式。
+这些属于优化，不再是“功能未实现”。
 
 #### 4. `useStudySession` 后续拆分
 
@@ -614,19 +649,20 @@ Resource Agent 后续可考虑网页正文抓取 / 课程目录抽取，但应�
 - ✅ delivery contract 跟随新 Hook 边界更新
 - ✅ 建立 Node 22 `node:test` 正式行为测试基线
 - ✅ 第二批覆盖 RAG policy / Learner Memory / message builders
+- ✅ `contextWindowRounds` 正式接入主 Study 模型回答
+- ✅ 多轮历史增加 12,000 字符预算、单消息压缩与 7 个行为测试
 
 ---
 
 ## 建议后续开发顺序
 
 ```text
-1. 扩大核心行为测试（rag.ts / conversation / practice / grading）
+1. 扩大核心行为测试（rag.ts / conversation persistence / practice / grading）
 2. 设计 SQLite schema 与 localStorage migration
-3. 实现 contextWindowRounds 多轮上下文
-4. 清理未消费 Settings 与超前产品文案
-5. 完成 Windows installer / signing / Release
-6. 再评估 Study Generation / Agent 拆分
-7. 再升级 Resource Agent / hybrid RAG / Agent 工具体系
+3. 清理未消费 Settings 与超前产品文案
+4. 完成 Windows installer / signing / Release
+5. 再评估 Study Generation / Agent 拆分
+6. 再升级 Resource Agent / hybrid RAG / provider-native history
 ```
 
 当前不建议继续大规模增加页面或堆新 Agent 功能。
@@ -643,6 +679,7 @@ Qizen
 ├─ Dashboard · 学习看板
 ├─ Study · 核心学习空间
 │  ├─ 会话历史 / persistence
+│  ├─ 最近 N 轮对话上下文
 │  ├─ 学习计划
 │  ├─ RAG / evidence
 │  ├─ Resource Agent
@@ -694,4 +731,5 @@ Qizen
 4. **用户学习数据与 secret 分开管理。**
 5. **核心重构先建立可验证边界，再迁移职责。**
 6. **字符串 contract 只做存在性守门，关键逻辑应逐步转为行为测试。**
-7. **新增功能前优先修正确性、迁移、测试和发布能力。**
+7. **当前问题、RAG 检索和历史上下文必须保持边界清晰。**
+8. **新增功能前优先修正确性、迁移、测试和发布能力。**
