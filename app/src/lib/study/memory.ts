@@ -2,8 +2,8 @@ import type { AppData } from "../storage";
 import { inferLearningTopic } from "./message-builders";
 
 // 长期学习记忆：全部从既有的 studyRecord / studyStats 派生，不引入新的持久层，
-// 与 Reports 同一套"按需派生"思路。诚实说明：练习暂无答题判分，
-// 因此这里给出的是"反复涉及、值得巩固的点"，而非严格意义的"常错点"。
+// 与 Reports 同一套“按需派生”思路。练习完成事件会携带 LLM 批改或用户自评得到的
+// weakQuestionPrompts，因此这里既能展示真实常错点，也会补充反复涉及、值得巩固的资料/主题。
 
 export interface WeakPoint {
   key: string;
@@ -27,7 +27,7 @@ export interface LearnerMemory {
   streak: StudyStreak;
   totalActiveDays: number;
   weakPoints: WeakPoint[];
-  /** 是否存在来自练习判分的真实答错点（决定 UI 用"常错点"还是"需巩固的点"） */
+  /** 是否存在来自练习判分的真实答错点（决定 UI 用“常错点”还是“需巩固的点”） */
   hasGradedWeakPoints: boolean;
   realModelRatio: number;
   preferredProvider: string | null;
