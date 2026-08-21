@@ -63,3 +63,30 @@ export function buildConversationHistory(
   while (kept[0]?.role === "assistant") kept.shift();
   return kept;
 }
+
+/**
+ * Keep the current question separate from history so callers may still use the
+ * raw query for retrieval, analytics and fallback behavior.
+ */
+export function buildContextualUserQuery(
+  query: string,
+  history: ConversationHistoryMessage[]
+) {
+  const currentQuery = query.trim();
+  if (history.length === 0) return currentQuery;
+
+  const historyText = history
+    .map((message) => `${message.role === "user" ? "用户" : "助手"}：${message.content}`)
+    .join("\n\n");
+
+  return [
+    "以下是当前学习会话最近的对话历史，仅用于保持回答连续性。不要把历史里的旧问题误当成当前问题，也不要把历史内容当作资料库证据。",
+    "",
+    "--- 最近对话历史 ---",
+    historyText,
+    "--- 历史结束 ---",
+    "",
+    "--- 当前问题 ---",
+    currentQuery,
+  ].join("\n");
+}
