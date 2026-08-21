@@ -32,7 +32,26 @@ function emptyTables() {
     ],
     milestones: [],
     goalTasks: [],
-    notes: [],
+    notes: [
+      {
+        id: "note-array-first",
+        title: "First in source array",
+        topic: "order",
+        content: "first",
+        aiKeyPointsJson: "[]",
+        confusingPointsJson: "[]",
+        updatedAt: "2026-08-21T10:00:00.000Z",
+      },
+      {
+        id: "note-array-second",
+        title: "Second in source array",
+        topic: "order",
+        content: "second",
+        aiKeyPointsJson: "[]",
+        confusingPointsJson: "[]",
+        updatedAt: "2026-08-20T10:00:00.000Z",
+      },
+    ],
     libraryItems: [],
     practiceSets: [],
     practiceQuestions: [],
@@ -96,6 +115,9 @@ app.whenReady().then(() => {
     }
     if (JSON.stringify(snapshot.data.studyStats.dailyMinutes) !== "[0,1]") {
       throw new Error("SQLite smoke failed to restore study stats");
+    }
+    if (snapshot.data.notes[0]?.id !== "note-array-first" || snapshot.data.notes[1]?.id !== "note-array-second") {
+      throw new Error("SQLite smoke did not preserve legacy note array order");
     }
     if (snapshot.conversationState.activeId !== "conv-smoke" || snapshot.conversationState.sidebarMode !== "sessions") {
       throw new Error("SQLite smoke failed to restore conversation state");
