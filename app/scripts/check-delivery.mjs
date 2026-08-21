@@ -9,6 +9,7 @@ function read(path) {
 
 const files = {
   session: read("src/hooks/useStudySession.ts"),
+  practice: read("src/hooks/useStudyPractice.ts"),
   webAgent: read("src/lib/webResourceAgent.ts"),
   messageBody: read("src/components/study/MessageBody.tsx"),
   messageList: read("src/components/study/MessageList.tsx"),
@@ -59,7 +60,11 @@ const checks = [
   },
   {
     name: "practice generation starts pomodoro timing",
-    pass: files.session.includes("setPomodoroRunning(true)") && files.session.includes("createPracticeSetFromRagResult"),
+    pass:
+      files.practice.includes("createPracticeSetFromRagResult") &&
+      files.practice.includes("onStartPomodoro()") &&
+      files.session.includes("onStartPomodoro") &&
+      files.session.includes("setPomodoroRunning(true)"),
   },
   {
     name: "resource panel exposes live/local/fallback status",
