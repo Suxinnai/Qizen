@@ -15,4 +15,5 @@ contextBridge.exposeInMainWorld("qizenSecrets", {
 contextBridge.exposeInMainWorld("qizenDatabase", {
   status: () => ipcRenderer.invoke("qizen:db:status"),
   importBundle: (bundle) => ipcRenderer.invoke("qizen:db:import-bundle", bundle),
+  exportBundle: () => ipcRenderer.invoke("qizen:db:export-bundle"),
 });
