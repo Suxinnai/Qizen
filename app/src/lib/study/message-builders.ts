@@ -7,7 +7,7 @@ import type { StudyPlanStep, StudyResourceLead } from "./types";
 export function inferLearningTopic(text: string) {
   return (
     text
-      .replace(/^(我想|我要|帮我|请帮我|想要|计划|学习|学一下|学)\s*/g, "")
+      .replace(/^(?:(?:我想|我要|帮我|请帮我|想要|计划|学习|学一下|学)\s*)+/, "")
       .replace(/(怎么学|如何学|学习计划|计划|路线|资源|资料|一下|可以吗|吧|。|！|!|\?)$/g, "")
       .trim()
       .slice(0, 36) || "这个主题"
