@@ -29,5 +29,6 @@ interface Window {
   qizenDatabase?: {
     status: () => Promise<QizenDatabaseStatus>;
     importBundle: (bundle: unknown) => Promise<QizenDatabaseStatus>;
+    exportBundle: () => Promise<unknown>;
   };
 }
