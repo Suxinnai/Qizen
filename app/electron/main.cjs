@@ -1,12 +1,14 @@
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
-const { app, BrowserWindow, ipcMain, shell } = require("electron");
+const { app, BrowserWindow, ipcMain, safeStorage, shell } = require("electron");
 
 const DEV_URL = process.env.QIZEN_ELECTRON_DEV_URL;
 const isSmokeTest = process.argv.includes("--smoke-test");
 const isVisualSmoke = process.argv.includes("--visual-smoke");
 const visualSmokeUrl = process.env.QIZEN_VISUAL_SMOKE_URL;
 const visualSmokeOut = process.env.QIZEN_VISUAL_SMOKE_OUT;
+const SAFE_STORAGE_PREFIX = "qizen-safe-storage-v1:";
 let visualSmokeRequired = [];
 try {
   visualSmokeRequired = JSON.parse(process.env.QIZEN_VISUAL_SMOKE_REQUIRED || "[]");
@@ -15,6 +17,12 @@ try {
 }
 
 let mainWindow = null;
+
+if (isSmokeTest) {
+  const smokeProfile = path.join(os.tmpdir(), `qizen-electron-smoke-${process.pid}`);
+  fs.mkdirSync(smokeProfile, { recursive: true });
+  app.setPath("userData", smokeProfile);
+}
 
 if (isVisualSmoke) {
   const visualSmokeProfile = process.env.QIZEN_VISUAL_SMOKE_PROFILE;
@@ -53,8 +61,80 @@ function safeSecretKey(key) {
 
 function secretPath(key) {
   const dir = path.join(app.getPath("userData"), "secrets");
-  fs.mkdirSync(dir, { recursive: true });
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   return path.join(dir, `${safeSecretKey(key)}.secret`);
+}
+
+function encodeSecret(value) {
+  const plainText = String(value);
+  if (!safeStorage.isEncryptionAvailable()) return plainText;
+  const encrypted = safeStorage.encryptString(plainText);
+  return `${SAFE_STORAGE_PREFIX}${encrypted.toString("base64")}`;
+}
+
+function decodeSecret(payload) {
+  if (!payload.startsWith(SAFE_STORAGE_PREFIX)) {
+    return { value: payload, encrypted: false };
+  }
+
+  if (!safeStorage.isEncryptionAvailable()) {
+    throw new Error("Encrypted secret exists but OS-backed decryption is unavailable");
+  }
+
+  const encoded = payload.slice(SAFE_STORAGE_PREFIX.length);
+  if (!encoded) return { value: "", encrypted: true };
+  return {
+    value: safeStorage.decryptString(Buffer.from(encoded, "base64")),
+    encrypted: true,
+  };
+}
+
+function writeSecret(key, value) {
+  const file = secretPath(key);
+  fs.writeFileSync(file, encodeSecret(value), { encoding: "utf8", mode: 0o600 });
+  return true;
+}
+
+function readSecret(key) {
+  const file = secretPath(key);
+  if (!fs.existsSync(file)) return null;
+
+  const payload = fs.readFileSync(file, "utf8");
+  const decoded = decodeSecret(payload);
+
+  // Backward compatibility: old releases stored plaintext `.secret` files.
+  // Migrate them in-place on the first successful read when OS encryption is available.
+  if (!decoded.encrypted && safeStorage.isEncryptionAvailable()) {
+    fs.writeFileSync(file, encodeSecret(decoded.value), { encoding: "utf8", mode: 0o600 });
+  }
+
+  return decoded.value;
+}
+
+function deleteSecret(key) {
+  const file = secretPath(key);
+  if (fs.existsSync(file)) fs.rmSync(file);
+  return true;
+}
+
+function verifySecretStorageSmoke() {
+  const key = "qizen-smoke-secret";
+  const value = `secret-${process.pid}-${Date.now()}`;
+  writeSecret(key, value);
+
+  const restored = readSecret(key);
+  if (restored !== value) {
+    throw new Error("Electron secret storage smoke failed to restore the stored value");
+  }
+
+  if (safeStorage.isEncryptionAvailable()) {
+    const payload = fs.readFileSync(secretPath(key), "utf8");
+    if (!payload.startsWith(SAFE_STORAGE_PREFIX) || payload.includes(value)) {
+      throw new Error("Electron secret storage smoke expected an encrypted payload");
+    }
+  }
+
+  deleteSecret(key);
 }
 
 function registerIpc() {
@@ -73,22 +153,11 @@ function registerIpc() {
     BrowserWindow.fromWebContents(event.sender)?.close();
   });
 
-  ipcMain.handle("qizen:secret:set", (_event, key, value) => {
-    fs.writeFileSync(secretPath(key), String(value), "utf8");
-    return true;
-  });
+  ipcMain.handle("qizen:secret:set", (_event, key, value) => writeSecret(key, value));
 
-  ipcMain.handle("qizen:secret:get", (_event, key) => {
-    const file = secretPath(key);
-    if (!fs.existsSync(file)) return null;
-    return fs.readFileSync(file, "utf8");
-  });
+  ipcMain.handle("qizen:secret:get", (_event, key) => readSecret(key));
 
-  ipcMain.handle("qizen:secret:delete", (_event, key) => {
-    const file = secretPath(key);
-    if (fs.existsSync(file)) fs.rmSync(file);
-    return true;
-  });
+  ipcMain.handle("qizen:secret:delete", (_event, key) => deleteSecret(key));
 }
 
 function createWindow() {
@@ -174,6 +243,7 @@ app.whenReady().then(() => {
     if (!fs.existsSync(path.join(__dirname, "preload.cjs"))) {
       throw new Error("Missing Electron preload script");
     }
+    verifySecretStorageSmoke();
     app.quit();
     return;
   }
@@ -202,4 +272,4 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
-module.exports = { createWindow, secretPath };
+module.exports = { createWindow, secretPath, readSecret, writeSecret, deleteSecret };
