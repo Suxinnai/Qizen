@@ -57,7 +57,7 @@ function readGoals(db) {
 }
 
 function readNotes(db) {
-  return all(db, "SELECT * FROM notes ORDER BY updated_at ASC, id ASC").map((row) => ({
+  return all(db, "SELECT * FROM notes ORDER BY rowid ASC").map((row) => ({
     id: row.id,
     title: row.title,
     topic: row.topic,
@@ -69,7 +69,7 @@ function readNotes(db) {
 }
 
 function readLibraryItems(db) {
-  return all(db, "SELECT * FROM library_items ORDER BY added_at ASC, id ASC").map((row) => ({
+  return all(db, "SELECT * FROM library_items ORDER BY rowid ASC").map((row) => ({
     id: row.id,
     title: row.title,
     originalFileName: row.original_file_name,
@@ -118,7 +118,7 @@ function readPracticeSets(db) {
 }
 
 function readKnowledgeGraph(db) {
-  const nodes = all(db, "SELECT * FROM knowledge_nodes ORDER BY id ASC").map((row) => ({
+  const nodes = all(db, "SELECT * FROM knowledge_nodes ORDER BY rowid ASC").map((row) => ({
     id: row.id,
     label: row.label,
     kind: row.kind,
@@ -129,7 +129,7 @@ function readKnowledgeGraph(db) {
     related: parseJson(row.related_json, []),
     studyHint: row.study_hint,
   }));
-  const edges = all(db, "SELECT * FROM knowledge_edges ORDER BY id ASC").map((row) => ({
+  const edges = all(db, "SELECT * FROM knowledge_edges ORDER BY rowid ASC").map((row) => ({
     id: row.id,
     source: row.source,
     target: row.target,
@@ -138,7 +138,7 @@ function readKnowledgeGraph(db) {
 }
 
 function readStudyEvents(db) {
-  return all(db, "SELECT * FROM study_events ORDER BY recorded_at ASC, id ASC").map((row) => ({
+  return all(db, "SELECT * FROM study_events ORDER BY rowid ASC").map((row) => ({
     id: row.id,
     type: row.type,
     recordedAt: row.recorded_at,
