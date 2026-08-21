@@ -8,6 +8,7 @@ const {
   getDatabaseStatus,
   closeQizenDatabase,
 } = require("./database.cjs");
+const { readQizenDatabaseSnapshot } = require("./database-read.cjs");
 
 const smokeDir = path.join(os.tmpdir(), `qizen-sqlite-smoke-${process.pid}`);
 fs.mkdirSync(smokeDir, { recursive: true });
@@ -31,7 +32,26 @@ function emptyTables() {
     ],
     milestones: [],
     goalTasks: [],
-    notes: [],
+    notes: [
+      {
+        id: "note-array-first",
+        title: "First in source array",
+        topic: "order",
+        content: "first",
+        aiKeyPointsJson: "[]",
+        confusingPointsJson: "[]",
+        updatedAt: "2026-08-21T10:00:00.000Z",
+      },
+      {
+        id: "note-array-second",
+        title: "Second in source array",
+        topic: "order",
+        content: "second",
+        aiKeyPointsJson: "[]",
+        confusingPointsJson: "[]",
+        updatedAt: "2026-08-20T10:00:00.000Z",
+      },
+    ],
     libraryItems: [],
     practiceSets: [],
     practiceQuestions: [],
@@ -83,6 +103,30 @@ app.whenReady().then(() => {
     if (imported.importedAt !== "2026-08-21T00:02:00.000Z") throw new Error("SQLite smoke import timestamp mismatch");
     if (imported.counts.goals !== 1 || imported.counts.studyConversations !== 1 || imported.counts.studyMessages !== 1) {
       throw new Error(`SQLite smoke unexpected counts: ${JSON.stringify(imported.counts)}`);
+    }
+
+    const snapshot = readQizenDatabaseSnapshot(db);
+    if (snapshot.schemaVersion !== 1 || snapshot.importedAt !== "2026-08-21T00:02:00.000Z") {
+      throw new Error("SQLite smoke snapshot metadata mismatch");
+    }
+    if (!snapshot.data.appState.onboardingCompleted) throw new Error("SQLite smoke failed to restore app state");
+    if (snapshot.data.goals[0]?.id !== "goal-smoke" || snapshot.data.goals[0]?.title !== "SQLite smoke") {
+      throw new Error("SQLite smoke failed to restore goal data");
+    }
+    if (JSON.stringify(snapshot.data.studyStats.dailyMinutes) !== "[0,1]") {
+      throw new Error("SQLite smoke failed to restore study stats");
+    }
+    if (snapshot.data.notes[0]?.id !== "note-array-first" || snapshot.data.notes[1]?.id !== "note-array-second") {
+      throw new Error("SQLite smoke did not preserve legacy note array order");
+    }
+    if (snapshot.conversationState.activeId !== "conv-smoke" || snapshot.conversationState.sidebarMode !== "sessions") {
+      throw new Error("SQLite smoke failed to restore conversation state");
+    }
+    if (snapshot.conversations[0]?.messages[0]?.content !== "hello sqlite") {
+      throw new Error("SQLite smoke failed to restore conversation messages");
+    }
+    if (JSON.stringify(snapshot).includes("must-be-rejected")) {
+      throw new Error("SQLite smoke snapshot unexpectedly exposed an API key");
     }
 
     const malicious = smokeBundle();

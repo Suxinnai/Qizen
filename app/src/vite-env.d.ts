@@ -15,6 +15,18 @@ interface QizenDatabaseStatus {
   };
 }
 
+interface QizenDatabaseSnapshot {
+  schemaVersion: number;
+  importedAt: string | null;
+  data: unknown;
+  conversations: unknown[];
+  conversationState: {
+    activeId: string | null;
+    sidebarMode: "menu" | "sessions";
+    legacySchemaVersion: number;
+  };
+}
+
 interface Window {
   qizenWindow?: {
     minimize: () => Promise<void>;
@@ -28,6 +40,7 @@ interface Window {
   };
   qizenDatabase?: {
     status: () => Promise<QizenDatabaseStatus>;
+    snapshot: () => Promise<QizenDatabaseSnapshot>;
     importBundle: (bundle: unknown) => Promise<QizenDatabaseStatus>;
   };
 }

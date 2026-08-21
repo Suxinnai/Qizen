@@ -5,6 +5,7 @@ const {
   getDatabaseStatus,
   closeQizenDatabase,
 } = require("./database.cjs");
+const { readQizenDatabaseSnapshot } = require("./database-read.cjs");
 
 let database = null;
 
@@ -17,6 +18,7 @@ function getDatabase() {
 
 function registerDatabaseIpc() {
   ipcMain.handle("qizen:db:status", () => getDatabaseStatus(getDatabase()));
+  ipcMain.handle("qizen:db:snapshot", () => readQizenDatabaseSnapshot(getDatabase()));
   ipcMain.handle("qizen:db:import-bundle", (_event, bundle) =>
     replaceFromMigrationBundle(getDatabase(), bundle)
   );
