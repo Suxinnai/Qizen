@@ -1,3 +1,4 @@
+import { loadAppData } from "./storage";
 import type { StudyResourceLead } from "./study/types";
 
 interface DuckDuckGoTopic {
@@ -17,10 +18,85 @@ interface DuckDuckGoResponse {
 
 type OpenSearchResponse = [string, string[], string[], string[]];
 
+interface CachedWebResourceEntry {
+  topic: string;
+  storedAt: number;
+  leads: StudyResourceLead[];
+}
+
+type WebResourceCache = Record<string, CachedWebResourceEntry>;
+
 export interface WebResourceAgentResult {
   leads: StudyResourceLead[];
   usedLiveSearch: boolean;
+  fromCache?: boolean;
   errorSummary?: string;
+}
+
+const CACHE_KEY = "qizen:web-resource-cache:v1";
+const MAX_CACHE_ENTRIES = 40;
+
+function canUseCacheStorage() {
+  return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
+}
+
+function normalizeCacheTopic(topic: string) {
+  return topic.trim().toLocaleLowerCase().replace(/\s+/g, " ");
+}
+
+function resolveCacheHours(override?: number) {
+  if (typeof override === "number" && Number.isFinite(override)) {
+    return Math.max(0, override);
+  }
+  try {
+    return Math.max(0, loadAppData().settings.searchCacheHours);
+  } catch {
+    return 0;
+  }
+}
+
+function readCache(): WebResourceCache {
+  if (!canUseCacheStorage()) return {};
+  const raw = window.localStorage.getItem(CACHE_KEY);
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw) as WebResourceCache;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function getCachedLiveLeads(topic: string, cacheHours: number) {
+  if (!canUseCacheStorage() || cacheHours <= 0) return null;
+  const key = normalizeCacheTopic(topic);
+  const entry = readCache()[key];
+  if (!entry || !Array.isArray(entry.leads) || entry.leads.length === 0) return null;
+  const maxAgeMs = cacheHours * 60 * 60 * 1000;
+  if (Date.now() - entry.storedAt > maxAgeMs) return null;
+  return entry.leads;
+}
+
+function writeCachedLiveLeads(topic: string, leads: StudyResourceLead[]) {
+  if (!canUseCacheStorage() || leads.length === 0) return;
+  try {
+    const key = normalizeCacheTopic(topic);
+    const cache = readCache();
+    cache[key] = {
+      topic: topic.trim(),
+      storedAt: Date.now(),
+      leads,
+    };
+
+    const pruned = Object.fromEntries(
+      Object.entries(cache)
+        .sort(([, a], [, b]) => b.storedAt - a.storedAt)
+        .slice(0, MAX_CACHE_ENTRIES)
+    );
+    window.localStorage.setItem(CACHE_KEY, JSON.stringify(pruned));
+  } catch {
+    // 缓存失败不应影响资源搜索主链路。
+  }
 }
 
 function searchUrl(query: string) {
@@ -188,9 +264,21 @@ export async function findLearningResources(input: {
   topic: string;
   localTitles: string[];
   timeoutMs?: number;
+  cacheHours?: number;
 }): Promise<WebResourceAgentResult> {
   const localLeads = localResourceLeads(input.localTitles);
   const fallbackLeads = fallbackWebLeads(input.topic);
+  const cacheHours = resolveCacheHours(input.cacheHours);
+  const cachedLiveLeads = getCachedLiveLeads(input.topic, cacheHours);
+
+  if (cachedLiveLeads) {
+    return {
+      leads: [...localLeads, ...cachedLiveLeads, ...fallbackLeads].slice(0, 5),
+      usedLiveSearch: true,
+      fromCache: true,
+    };
+  }
+
   const controller = new AbortController();
   const timer = globalThis.setTimeout(() => controller.abort(), input.timeoutMs ?? 5500);
 
@@ -209,15 +297,18 @@ export async function findLearningResources(input: {
     ].filter((lead, index, list) => list.findIndex((item) => item.url === lead.url) === index);
 
     if (liveLeads.length > 0) {
+      writeCachedLiveLeads(input.topic, liveLeads);
       return {
         leads: [...localLeads, ...liveLeads, ...fallbackLeads].slice(0, 5),
         usedLiveSearch: true,
+        fromCache: false,
       };
     }
 
     return {
       leads: [...localLeads, ...fallbackLeads].slice(0, 5),
       usedLiveSearch: false,
+      fromCache: false,
       errorSummary: "在线搜索没有返回可直接引用的结果，已提供可点击搜索入口。",
     };
   } catch (error) {
@@ -230,6 +321,7 @@ export async function findLearningResources(input: {
     return {
       leads: [...localLeads, ...fallbackLeads].slice(0, 5),
       usedLiveSearch: false,
+      fromCache: false,
       errorSummary,
     };
   } finally {
