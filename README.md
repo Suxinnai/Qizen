@@ -64,7 +64,7 @@ Qizen 不是题库、网课聚合器，也不是单纯给聊天模型套一层�
 | Adaptive Practice | ✅ | 根据历史学习事件推断基础 / 进阶 / 综合难度 |
 | Practice Grading | ✅ | 有模型时 LLM 批改；无模型时自评；记录分数与薄弱题 |
 | Learner Memory | ✅ MVP | 连续学习、常错点、模型使用、主要 Provider 等派生记忆 |
-| Reports | ✅ / ⚠️ | 图表与时间线已实现；练习完成统计存在一个已确认双计数 bug，见下文 |
+| Reports | ✅ | 图表与时间线已实现；练习完成统计已去重并兼容旧数据，完成率限制在 0–100% |
 | Profile | ✅ | 昵称、VARK 雷达图、学习记忆、统计、最近活动、重新评测 |
 | Settings | ✅ 基础可用 | 模型、自动行为、RAG、缓存、数据等配置；部分字段仍未消费 |
 | API Key 存储 | ✅ Electron | 使用 Electron `safeStorage`；旧明文 secret 可自动迁移 |
@@ -419,31 +419,7 @@ pnpm verify:delivery
 
 ### P0 — 稳定性 / 数据正确性
 
-#### 1. Reports 练习完成统计重复计数（已确认 bug）
-
-`PracticeStatsCard` 当前同时把以下两者相加：
-
-```text
-practice-completed events
-+
-practiceSets.status === completed
-```
-
-而练习批改完成时，现有逻辑会同时：
-
-1. 把对应 practice set 标为 `completed`
-2. 写入 `practice-completed` event
-
-因此同一练习可能被计算两次，完成率甚至可能超过 100%。
-
-修复原则：
-
-- `practice-completed` event 作为新数据的主要真源。
-- `practiceSets.status` 仅用于旧数据兼容 fallback。
-- 完成率强制限制在 0–100%。
-- 后续最好给练习事件增加稳定 `practiceSetId`，从数据模型上支持去重。
-
-#### 2. 拆 `useStudySession.ts`
+#### 1. 拆 `useStudySession.ts`
 
 `Study.tsx` 已经变轻，但复杂度集中到了 `app/src/hooks/useStudySession.ts`。
 
@@ -474,7 +450,7 @@ useStudyProgress
 
 并逐步用 reducer / state machine 收敛状态转换。
 
-#### 3. localStorage → SQLite
+#### 2. localStorage → SQLite
 
 当前资料、学习事件、知识图谱、目标和报告数据仍依赖 localStorage。
 
@@ -490,7 +466,7 @@ Drizzle 可以作为候选 ORM，但先设计数据边界再选实现。
 
 ### P1 — 测试 / 发布 / 核心能力
 
-#### 4. 正式自动化测试
+#### 3. 正式自动化测试
 
 现在已经有 CI，但仍没有 Vitest / React Testing Library / Playwright。
 
@@ -505,7 +481,7 @@ Drizzle 可以作为候选 ORM，但先设计数据边界再选实现。
 - LLM 批改 JSON 防御性解析
 - Library 上传解析回归
 
-#### 5. LLM 多轮上下文
+#### 4. LLM 多轮上下文
 
 `contextWindowRounds` 目前仍未真正进入模型请求。
 
@@ -521,7 +497,7 @@ Drizzle 可以作为候选 ORM，但先设计数据边界再选实现。
 
 并同时兼容 OpenAI-compatible 与 Anthropic message 格式。
 
-#### 6. 桌面产品发布链
+#### 5. 桌面产品发布链
 
 当前缺少：
 
@@ -533,7 +509,7 @@ Drizzle 可以作为候选 ORM，但先设计数据边界再选实现。
 
 进入外部用户测试前必须补齐。
 
-#### 7. RAG 升级
+#### 6. RAG 升级
 
 当前关键词 RAG 对小型个人资料库足够，后续可逐步升级：
 
@@ -547,7 +523,7 @@ Drizzle 可以作为候选 ORM，但先设计数据边界再选实现。
 
 ### P2 — 产品一致性
 
-#### 8. 清理未消费 Settings
+#### 7. 清理未消费 Settings
 
 仍需决定“实现还是移除 UI”：
 
@@ -556,7 +532,7 @@ Drizzle 可以作为候选 ORM，但先设计数据边界再选实现。
 - `autoUpdateLearningProfile`
 - `remindersEnabled`
 
-#### 9. 修正文案超前
+#### 8. 修正文案超前
 
 仍需继续核对：
 
@@ -577,20 +553,20 @@ Drizzle 可以作为候选 ORM，但先设计数据边界再选实现。
 - ✅ 删除无引用旧 `storage/types.ts`
 - ✅ 去掉 Study 空状态“数学定理”学科硬编码
 - ✅ 合并 Notes Markdown / Settings Switch / EmptyState / Onboarding VARK UI polish
+- ✅ 修复 Reports 练习完成双计数；completion event 作为新数据真源，旧 practiceSets 仅作兼容 fallback
 
 ---
 
 ## 建议后续开发顺序
 
 ```text
-1. 修复 Reports 练习完成双计数
-2. 拆 useStudySession，收敛会话状态
-3. 补正式单元 / 集成 / E2E 测试
-4. 设计 SQLite schema 与 localStorage migration
-5. 清理未消费 Settings 与超前产品文案
-6. 完成 Windows installer / signing / Release
-7. 正式实现 contextWindowRounds 多轮上下文
-8. 再升级 Resource Agent / RAG / Agent 工具体系
+1. 拆 useStudySession，收敛会话状态
+2. 补正式单元 / 集成 / E2E 测试
+3. 设计 SQLite schema 与 localStorage migration
+4. 清理未消费 Settings 与超前产品文案
+5. 完成 Windows installer / signing / Release
+6. 正式实现 contextWindowRounds 多轮上下文
+7. 再升级 Resource Agent / RAG / Agent 工具体系
 ```
 
 当前不建议继续大规模增加页面。
