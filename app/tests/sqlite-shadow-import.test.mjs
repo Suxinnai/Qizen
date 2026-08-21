@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   ensureSqliteShadowImport,
   hasMeaningfulLocalData,
+  runSqliteShadowImportAtStartup,
 } from "../src/lib/persistence/sqlite-shadow-import.ts";
 
 function emptyData() {
@@ -212,4 +213,43 @@ test("database import errors are surfaced so startup can log and retry later", a
     }),
     /transaction failed/
   );
+});
+
+test("startup shadow import preserves successful results", async () => {
+  const existing = status({ importedAt: "2026-08-21T04:00:00.000Z" });
+  const result = await runSqliteShadowImportAtStartup({
+    database: {
+      status: async () => existing,
+      importBundle: async () => existing,
+    },
+  });
+
+  assert.equal(result.kind, "already-imported");
+  assert.equal(result.status.importedAt, "2026-08-21T04:00:00.000Z");
+});
+
+test("startup shadow import converts failures into a non-blocking failed result", async () => {
+  const data = emptyData();
+  data.appState.onboardingCompleted = true;
+  const logged = [];
+
+  const result = await runSqliteShadowImportAtStartup(
+    {
+      database: {
+        status: async () => status(),
+        importBundle: async () => {
+          throw new Error("disk unavailable");
+        },
+      },
+      loadData: () => data,
+      listConversations: () => [],
+      getActiveConversationId: () => null,
+      getSidebarMode: () => "menu",
+    },
+    (error) => logged.push(error)
+  );
+
+  assert.deepEqual(result, { kind: "failed", errorSummary: "disk unavailable" });
+  assert.equal(logged.length, 1);
+  assert.match(String(logged[0]?.message || logged[0]), /disk unavailable/);
 });

@@ -42,6 +42,10 @@ export type SqliteShadowImportResult =
   | { kind: "empty"; status: SqliteDatabaseStatus }
   | { kind: "imported"; status: SqliteDatabaseStatus };
 
+export type SqliteShadowImportStartupResult =
+  | SqliteShadowImportResult
+  | { kind: "failed"; errorSummary: string };
+
 export function hasMeaningfulLocalData(
   data: Pick<
     AppData,
@@ -111,4 +115,27 @@ export async function ensureSqliteShadowImport(
 
   const imported = await database.importBundle(bundle);
   return { kind: "imported", status: imported };
+}
+
+/**
+ * Best-effort startup entry point.
+ *
+ * Shadow import must never block application rendering. Failures are surfaced
+ * to a logger and converted into a stable result; because SQLite's importedAt
+ * marker is only written after a committed transaction, a later app launch can
+ * safely retry the import.
+ */
+export async function runSqliteShadowImportAtStartup(
+  deps: SqliteShadowImportDeps = {},
+  onError: (error: unknown) => void = (error) => console.warn("Qizen SQLite shadow import failed", error)
+): Promise<SqliteShadowImportStartupResult> {
+  try {
+    return await ensureSqliteShadowImport(deps);
+  } catch (error) {
+    onError(error);
+    return {
+      kind: "failed",
+      errorSummary: error instanceof Error ? error.message : "SQLite shadow import failed",
+    };
+  }
 }
