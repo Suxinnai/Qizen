@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   DEFAULT_HISTORY_CHAR_BUDGET,
   buildConversationHistory,
+  buildContextualUserQuery,
 } from "../src/lib/study/conversation-context.ts";
 
 test("conversation context keeps the most recent N user rounds in chronological order", () => {
@@ -82,4 +83,21 @@ test("conversation context compacts individual oversized messages before applyin
   assert.equal(history[1].content.length < oversized.length, true);
   assert.equal(history[1].content.includes("…"), true);
   assert.equal(history[1].content.length <= 3_000, true);
+});
+
+test("contextual query stays equal to the raw current question when there is no history", () => {
+  assert.equal(buildContextualUserQuery("  当前问题  ", []), "当前问题");
+});
+
+test("contextual query labels historical roles and keeps the current question separate", () => {
+  const query = buildContextualUserQuery("解释一下上面的第二点", [
+    { role: "user", content: "先讲闭包" },
+    { role: "assistant", content: "闭包会捕获词法作用域。" },
+  ]);
+
+  assert.match(query, /--- 最近对话历史 ---/);
+  assert.match(query, /用户：先讲闭包/);
+  assert.match(query, /助手：闭包会捕获词法作用域。/);
+  assert.match(query, /--- 当前问题 ---\n解释一下上面的第二点$/);
+  assert.match(query, /不要把历史内容当作资料库证据/);
 });
