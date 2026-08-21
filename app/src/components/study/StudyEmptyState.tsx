@@ -76,7 +76,7 @@ export function StudyEmptyState({ onSendPrompt }: { onSendPrompt: (text: string)
                 type="button"
                 onClick={() =>
                   onSendPrompt(
-                    `我想学习资料《${doc.title}》的内容，请帮我概括一下它的核心重点与包含的数学定理。`
+                    `我想学习资料《${doc.title}》的内容，请帮我概括它的核心重点、关键概念以及最值得继续深入的部分。`
                   )
                 }
                 className="qz-card !p-4 hover:border-qz-primary/30 dark:hover:border-qz-primary/30 transition-all hover:-translate-y-0.5 text-left flex flex-col gap-2 group cursor-pointer"
