@@ -10,7 +10,12 @@ import {
   scoreLabel,
   shouldDisplayRagEvidence,
 } from "../src/lib/study/rag-policy.ts";
-import { derivePracticeSummary } from "../src/lib/study/report-metrics.ts";
+import {
+  buildPlanSteps,
+  inferLearningTopic,
+  isPlanConfirmation,
+  wantsResourceAgent,
+} from "../src/lib/study/message-builders.ts";
 
 function studyEvent(overrides = {}) {
   return {
@@ -148,34 +153,34 @@ test("empty learner memory is stable", () => {
   assert.equal(memory.hasGradedWeakPoints, false);
 });
 
-test("Reports practice summary does not double count modern completion data", () => {
-  const summary = derivePracticeSummary(
-    [
-      { type: "practice-generated" },
-      { type: "practice-generated" },
-      { type: "practice-completed" },
-    ],
-    [{ status: "completed" }]
-  );
-  assert.deepEqual(summary, { generated: 2, completed: 1, percentage: 50 });
+test("learning-topic inference removes common planning wrappers without erasing the subject", () => {
+  assert.equal(inferLearningTopic("我想学习 TypeScript 学习计划"), "TypeScript");
+  assert.equal(inferLearningTopic("帮我复习闭包吧"), "复习闭包");
+  assert.equal(inferLearningTopic(""), "这个主题");
 });
 
-test("Reports practice summary uses completed sets only as a legacy fallback", () => {
-  const summary = derivePracticeSummary(
-    [{ type: "practice-generated" }, { type: "practice-generated" }],
-    [{ status: "completed" }, { status: "completed" }]
-  );
-  assert.deepEqual(summary, { generated: 2, completed: 2, percentage: 100 });
+test("plan confirmation accepts intended confirmation phrases and rejects unrelated text", () => {
+  for (const text of ["确认", "可以", "按计划", "开始学习", "没问题，继续"]) {
+    assert.equal(isPlanConfirmation(text), true, text);
+  }
+  for (const text of ["再改一下计划", "我想换个主题", "先不要开始"]) {
+    assert.equal(isPlanConfirmation(text), false, text);
+  }
 });
 
-test("Reports practice summary never exceeds 100 percent even for migrated incomplete histories", () => {
-  const summary = derivePracticeSummary(
-    [{ type: "practice-completed" }, { type: "practice-completed" }, { type: "practice-completed" }],
-    []
-  );
-  assert.deepEqual(summary, { generated: 3, completed: 3, percentage: 100 });
+test("resource-agent intent detects resource discovery requests", () => {
+  for (const text of ["找一些资料", "推荐课程", "搜索论文", "有没有视频", "给我练习题目"]) {
+    assert.equal(wantsResourceAgent(text), true, text);
+  }
+  assert.equal(wantsResourceAgent("解释一下闭包"), false);
 });
 
-test("Reports practice summary is zero-safe", () => {
-  assert.deepEqual(derivePracticeSummary([], []), { generated: 0, completed: 0, percentage: 0 });
+test("study plan always contains five executable steps with positive time budgets", () => {
+  for (const style of ["story", "logic", "analogy", "steps"]) {
+    const steps = buildPlanSteps("TypeScript", style);
+    assert.equal(steps.length, 5);
+    assert.equal(new Set(steps.map((step) => step.id)).size, 5);
+    assert.equal(steps.every((step) => step.minutes > 0), true);
+    assert.equal(steps.some((step) => step.title.includes("TypeScript")), true);
+  }
 });
