@@ -16,6 +16,7 @@ import {
   retrieveRelevantLibraryContext,
   type LibraryRagResult,
 } from "../lib/rag";
+import { buildConversationHistory, buildContextualUserQuery } from "../lib/study/conversation-context";
 import { isNonLearningChat, shouldSearchKnowledgeBase } from "../lib/study/intent";
 import { collectHitResourceTitles, createEmptyRag, getStrongRag } from "../lib/study/rag-policy";
 import { buildAssistantReply, buildContextStudyPlan, isStudyPlanRequest } from "../lib/study/reply-policy";
@@ -466,6 +467,8 @@ export function useStudySession(routeContext: StudyLocationState | null, routeCo
 
     // 学习型问题：走真实模型并实时流式渲染（成功时 token 逐步到达）。
     if (shouldUseModelForAnswer) {
+      const conversationHistory = buildConversationHistory(messages, data.settings.contextWindowRounds);
+      const modelQuery = buildContextualUserQuery(text, conversationHistory);
       const assistantId = "a-" + (Date.now() + 1);
       const sharedTriggers = triggerHints.length ? Array.from(new Set(triggerHints)) : undefined;
       const streamingShell: ChatMessage = {
@@ -482,7 +485,7 @@ export function useStudySession(routeContext: StudyLocationState | null, routeCo
 
       let rawAnswer = "";
       const llmResult = await generateStudyAnswer({
-        query: text,
+        query: modelQuery,
         rag,
         style: teachingStyle,
         profileText,

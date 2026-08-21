@@ -10,6 +10,7 @@ function read(path) {
 const files = {
   session: read("src/hooks/useStudySession.ts"),
   practice: read("src/hooks/useStudyPractice.ts"),
+  conversationContext: read("src/lib/study/conversation-context.ts"),
   webAgent: read("src/lib/webResourceAgent.ts"),
   messageBody: read("src/components/study/MessageBody.tsx"),
   messageList: read("src/components/study/MessageList.tsx"),
@@ -65,6 +66,16 @@ const checks = [
       files.practice.includes("onStartPomodoro()") &&
       files.session.includes("onStartPomodoro") &&
       files.session.includes("setPomodoroRunning(true)"),
+  },
+  {
+    name: "contextWindowRounds feeds bounded history into model answers",
+    pass:
+      files.session.includes("buildConversationHistory") &&
+      files.session.includes("data.settings.contextWindowRounds") &&
+      files.session.includes("buildContextualUserQuery") &&
+      files.session.includes("query: modelQuery") &&
+      files.conversationContext.includes("DEFAULT_HISTORY_CHAR_BUDGET") &&
+      files.conversationContext.includes("buildContextualUserQuery"),
   },
   {
     name: "resource panel exposes live/local/fallback status",

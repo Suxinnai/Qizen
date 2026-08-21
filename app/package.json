@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "test:unit": "node --experimental-strip-types --test tests/study-policies.test.mjs tests/study-memory-rag-builders.test.mjs",
+    "test:unit": "node --experimental-strip-types --test tests/study-policies.test.mjs tests/study-memory-rag-builders.test.mjs tests/study-conversation-context.test.mjs",
     "verify:delivery": "node scripts/verify-delivery.cjs",
     "check:delivery": "node scripts/check-delivery.mjs",
     "smoke:resources": "node scripts/resource-agent-smoke.mjs",
