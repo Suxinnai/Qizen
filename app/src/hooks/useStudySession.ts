@@ -27,17 +27,7 @@ import { inferLearnerLevel } from "../lib/study/adaptive";
 import { resolveLlmProviderConfig } from "../lib/secretStore";
 import { generateStudyAnswer, generateStudyConversationTitle, gradePracticeAnswers, sanitizeLlmText, type PracticeGradeResult } from "../lib/llm";
 import { findLearningResources } from "../lib/webResourceAgent";
-import {
-  buildStudyConversationTitle,
-  createStudyConversation,
-  sanitizePersistedText,
-  getActiveStudyConversationId,
-  getStudyConversation,
-  getStudyConversationChangeEventName,
-  setActiveStudyConversationId,
-  upsertStudyConversation,
-  type PersistedStudyConversation,
-} from "../lib/studyConversations";
+import type { PersistedStudyConversation } from "../lib/studyConversations";
 import { getStudyTree, flattenTasks, buildInitialMessages } from "../lib/study/study-helpers";
 import {
   buildLearningStartMarkdown,
@@ -50,6 +40,7 @@ import {
   wantsResourceAgent,
 } from "../lib/study/message-builders";
 import type { ChatMessage, PanelKey, StudyJourneyStage, StudyLocationState, StudyPlanStep, StudyResourceLead } from "../lib/study/types";
+import { useStudyConversationPersistence } from "./useStudyConversationPersistence";
 import { useStudyPomodoro } from "./useStudyPomodoro";
 
 const STREAM_CHUNK_SIZE = 8;
@@ -87,8 +78,6 @@ export function useStudySession(routeContext: StudyLocationState | null, routeCo
   const [journeyStage, setJourneyStage] = useState<StudyJourneyStage>("define");
   const [pendingPlanSteps, setPendingPlanSteps] = useState<StudyPlanStep[]>([]);
   const [resourceLeads, setResourceLeads] = useState<StudyResourceLead[]>([]);
-  const [conversationTitle, setConversationTitle] = useState<string | null>(null);
-  const [activeConversationId, setActiveConversationIdState] = useState<string | null>(() => getActiveStudyConversationId());
   const [, setStudyInteractionCount] = useState(getStudyInteractionCount(data));
   const [conversationContext, setConversationContext] = useState<StudyLocationState | null>(routeContext);
   const {
@@ -100,15 +89,7 @@ export function useStudySession(routeContext: StudyLocationState | null, routeCo
     setPomodoroSeconds,
   } = useStudyPomodoro(data.settings.pomodoroMinutes);
 
-  const activeConversationIdRef = useRef(activeConversationId);
-  const activeConversationHydratedRef = useRef(false);
-  const skipNextConversationSyncRef = useRef(false);
   const contextSyncRef = useRef(false);
-  const hydratedConversationRef = useRef(false);
-
-  useEffect(() => {
-    activeConversationIdRef.current = activeConversationId;
-  }, [activeConversationId]);
 
   // --- Derived state ---
   const selectedResource = conversationContext?.resourceId
@@ -143,6 +124,20 @@ export function useStudySession(routeContext: StudyLocationState | null, routeCo
     : selectedNote
     ? selectedNote.title
     : selectedTask?.title ?? "当前任务";
+  const { conversationTitle, setConversationTitle, persistCurrentConversation } =
+    useStudyConversationPersistence({
+      messages,
+      noteDraft,
+      selectedTaskId,
+      conversationContext,
+      isFreeConversation,
+      teachingStyle,
+      baseLearningGoal,
+      selectedResourceTitle: selectedResource?.title,
+      routeContext,
+      onReset: resetStudySession,
+      onHydrate: hydrateStudyConversation,
+    });
   const learningGoal = conversationTitle?.trim() || baseLearningGoal;
   const completedToday = tasks.filter((task) => task.done).length;
   const sessionSummaryText = isUnboundFreeSession
@@ -189,51 +184,6 @@ export function useStudySession(routeContext: StudyLocationState | null, routeCo
     });
   }, [messages, autoTriggered, data.settings]);
 
-  // --- Conversation persistence ---
-  function buildConversationSnapshot(override?: Partial<PersistedStudyConversation>): PersistedStudyConversation {
-    const currentConversationId = activeConversationIdRef.current;
-    const snapshotMessages = (override?.messages as ChatMessage[] | undefined) ?? messages;
-    const snapshotContext = override?.context ?? conversationContext;
-    const snapshotIsFreeConversation = override?.isFreeConversation ?? isFreeConversation;
-    const snapshotSelectedTaskId = override?.selectedTaskId ?? selectedTaskId;
-    const snapshotNoteDraft = override?.noteDraft ?? noteDraft;
-    const firstUserMessage = sanitizeLlmText(snapshotMessages.find((m) => m.role === "user")?.content ?? "");
-    const firstAssistantMessage = sanitizeLlmText(snapshotMessages.find((m) => m.role === "assistant")?.content ?? "");
-    const title = buildStudyConversationTitle({
-      manualTitle: override?.title ?? conversationTitle ?? undefined,
-      selectedTaskTitle: baseLearningGoal,
-      resourceTitle: selectedResource?.title,
-      firstUserMessage,
-      firstAssistantMessage,
-      isFreeConversation: snapshotIsFreeConversation,
-    });
-
-    return {
-      id: currentConversationId ?? `study-conv-${Date.now()}`,
-      title,
-      createdAt: override?.createdAt ?? new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      isFreeConversation: snapshotIsFreeConversation,
-      context: snapshotContext,
-      selectedTaskId: snapshotSelectedTaskId,
-      teachingStyle,
-      noteDraft: snapshotNoteDraft,
-      messages: snapshotMessages,
-    };
-  }
-
-  function persistCurrentConversation(override?: Partial<PersistedStudyConversation>) {
-    const snapshot = buildConversationSnapshot(override);
-    const saved = activeConversationIdRef.current ? upsertStudyConversation(snapshot) : createStudyConversation(snapshot);
-    setConversationTitle(sanitizeLlmText(saved.title));
-    activeConversationIdRef.current = saved.id;
-    activeConversationHydratedRef.current = true;
-    skipNextConversationSyncRef.current = true;
-    setActiveConversationIdState(saved.id);
-    setActiveStudyConversationId(saved.id);
-    return saved;
-  }
-
   function resetStudySession(next: { context?: StudyLocationState | null; freeMode?: boolean } = {}) {
     const nextContext = next.context === undefined ? conversationContext : next.context;
     const nextResource = nextContext?.resourceId
@@ -268,6 +218,31 @@ export function useStudySession(routeContext: StudyLocationState | null, routeCo
     setActivePanel(null);
   }
 
+  function hydrateStudyConversation(
+    conversation: PersistedStudyConversation,
+    hydratedMessages: ChatMessage[]
+  ) {
+    setConversationContext(conversation.context);
+    setIsFreeConversation(conversation.isFreeConversation);
+    setSelectedTaskId(conversation.context?.taskId ?? conversation.selectedTaskId);
+    setMessages(hydratedMessages);
+    setNoteDraft(conversation.noteDraft);
+    setInput("");
+    setLatestRag(null);
+    setPracticeSet(null);
+    setPracticeHint("");
+    setJourneyStage(conversation.messages.some((message) => message.kind === "plan") ? "plan" : "learn");
+    setPendingPlanSteps(
+      (conversation.messages.find((message) => message.planSteps?.length)?.planSteps as StudyPlanStep[] | undefined) ?? []
+    );
+    setResourceLeads(
+      (conversation.messages.find((message) => message.resourceLeads?.length)?.resourceLeads as StudyResourceLead[] | undefined) ?? []
+    );
+    setIsGeneratingAnswer(false);
+    setAutoTriggered(new Set());
+    setActivePanel(null);
+  }
+
   useEffect(() => {
     if (!contextSyncRef.current) {
       contextSyncRef.current = true;
@@ -275,79 +250,6 @@ export function useStudySession(routeContext: StudyLocationState | null, routeCo
     }
     resetStudySession({ context: routeContext, freeMode: false });
   }, [routeContextKey]);
-
-  useEffect(() => {
-    const sync = () => {
-      const nextId = getActiveStudyConversationId();
-      if (skipNextConversationSyncRef.current && nextId === activeConversationIdRef.current) {
-        skipNextConversationSyncRef.current = false;
-        return;
-      }
-      if (nextId === activeConversationIdRef.current && activeConversationHydratedRef.current) return;
-      activeConversationIdRef.current = nextId;
-      setActiveConversationIdState(nextId);
-      if (!nextId) {
-        activeConversationHydratedRef.current = true;
-        setConversationTitle(null);
-        resetStudySession({ context: routeContext, freeMode: !routeContext });
-        return;
-      }
-      const conversation = getStudyConversation(nextId);
-      if (!conversation) return;
-      activeConversationHydratedRef.current = true;
-      hydratedConversationRef.current = true;
-      setConversationTitle(conversation.title);
-      setConversationContext(conversation.context);
-      setIsFreeConversation(conversation.isFreeConversation);
-      setSelectedTaskId(conversation.context?.taskId ?? conversation.selectedTaskId);
-      setMessages(
-        (conversation.messages as ChatMessage[]).map((message) => ({
-          ...message,
-          content: sanitizePersistedText(message.content),
-        }))
-      );
-      setNoteDraft(conversation.noteDraft);
-      setInput("");
-      setLatestRag(null);
-      setPracticeSet(null);
-      setPracticeHint("");
-      setJourneyStage(conversation.messages.some((message) => message.kind === "plan") ? "plan" : "learn");
-      setPendingPlanSteps(
-        (conversation.messages.find((message) => message.planSteps?.length)?.planSteps as StudyPlanStep[] | undefined) ?? []
-      );
-      setResourceLeads(
-        (conversation.messages.find((message) => message.resourceLeads?.length)?.resourceLeads as StudyResourceLead[] | undefined) ?? []
-      );
-      setIsGeneratingAnswer(false);
-      setAutoTriggered(new Set());
-      setActivePanel(null);
-    };
-
-    const handleNew = () => {
-      activeConversationIdRef.current = null;
-      activeConversationHydratedRef.current = true;
-      skipNextConversationSyncRef.current = true;
-      setActiveStudyConversationId(null);
-      setActiveConversationIdState(null);
-      setConversationTitle(null);
-      resetStudySession({ context: null, freeMode: true });
-    };
-
-    sync();
-    window.addEventListener(getStudyConversationChangeEventName(), sync);
-    window.addEventListener("qizen-study-start-new", handleNew);
-    return () => {
-      window.removeEventListener(getStudyConversationChangeEventName(), sync);
-      window.removeEventListener("qizen-study-start-new", handleNew);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!messages.length) return;
-    if (!hydratedConversationRef.current && messages.every((m) => m.role === "assistant")) return;
-    hydratedConversationRef.current = true;
-    persistCurrentConversation();
-  }, [messages, noteDraft, selectedTaskId, conversationContext, isFreeConversation]);
 
   // --- Business logic ---
   function shouldGenerateAiTitle(nextMessages: ChatMessage[]) {
