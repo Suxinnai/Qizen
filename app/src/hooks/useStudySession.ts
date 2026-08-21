@@ -50,6 +50,7 @@ import {
   wantsResourceAgent,
 } from "../lib/study/message-builders";
 import type { ChatMessage, PanelKey, StudyJourneyStage, StudyLocationState, StudyPlanStep, StudyResourceLead } from "../lib/study/types";
+import { useStudyPomodoro } from "./useStudyPomodoro";
 
 const STREAM_CHUNK_SIZE = 8;
 const STREAM_DELAY_MS = 14;
@@ -70,8 +71,6 @@ export function useStudySession(routeContext: StudyLocationState | null, routeCo
   const [selectedTaskId, setSelectedTaskId] = useState<string>(
     routeContext?.taskId ?? goal?.milestones?.[0]?.tasks?.[0]?.id ?? tasks[0]?.id ?? ""
   );
-  const [pomodoroSeconds, setPomodoroSeconds] = useState(data.settings.pomodoroMinutes * 60);
-  const [pomodoroRunning, setPomodoroRunning] = useState(false);
   const [noteDraft, setNoteDraft] = useState(() => data.notes[0]?.content ?? "");
   const [input, setInput] = useState("");
   const [activePanel, setActivePanel] = useState<PanelKey | null>(null);
@@ -92,6 +91,14 @@ export function useStudySession(routeContext: StudyLocationState | null, routeCo
   const [activeConversationId, setActiveConversationIdState] = useState<string | null>(() => getActiveStudyConversationId());
   const [, setStudyInteractionCount] = useState(getStudyInteractionCount(data));
   const [conversationContext, setConversationContext] = useState<StudyLocationState | null>(routeContext);
+  const {
+    pomodoroSeconds,
+    pomodoroRunning,
+    pomodoroProgress,
+    totalSeconds,
+    setPomodoroRunning,
+    setPomodoroSeconds,
+  } = useStudyPomodoro(data.settings.pomodoroMinutes);
 
   const activeConversationIdRef = useRef(activeConversationId);
   const activeConversationHydratedRef = useRef(false);
@@ -149,8 +156,6 @@ export function useStudySession(routeContext: StudyLocationState | null, routeCo
     : activeMilestone
     ? "理解" + activeMilestone.title.replace(/^第\s*\d+\s*章\s*/, "")
     : selectedTask?.meta ?? `今日完成 ${completedToday}/${tasks.length}`;
-  const totalSeconds = data.settings.pomodoroMinutes * 60;
-  const pomodoroProgress = totalSeconds > 0 ? Math.max(0, Math.min(1, 1 - pomodoroSeconds / totalSeconds)) : 0;
   const sessionStatus = getStudySessionStatus({
     isFreeConversation,
     context: conversationContext,
@@ -162,18 +167,6 @@ export function useStudySession(routeContext: StudyLocationState | null, routeCo
   );
 
   // --- Effects ---
-  useEffect(() => {
-    if (!pomodoroRunning) return;
-    const timer = window.setInterval(() => {
-      setPomodoroSeconds((prev) => (prev <= 1 ? 0 : prev - 1));
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, [pomodoroRunning]);
-
-  useEffect(() => {
-    if (pomodoroSeconds === 0) setPomodoroRunning(false);
-  }, [pomodoroSeconds]);
-
   useEffect(() => {
     const last = messages[messages.length - 1];
     if (!last?.triggers || last.role !== "assistant") return;
