@@ -328,6 +328,25 @@ export default function Onboarding() {
                       </div>
                     </div>
                     
+                    {/* VARK 四维测评预览 */}
+                    <div className="flex items-center gap-2 mb-8 flex-wrap select-none">
+                      <span className="text-[11px] text-qz-text-muted font-medium mr-1">测评维度</span>
+                      {(Object.keys(MODE_THEMES) as OptionValue[]).map((modeKey) => {
+                        const theme = MODE_THEMES[modeKey];
+                        const Icon = theme.icon;
+                        return (
+                          <span
+                            key={modeKey}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border"
+                            style={{ color: theme.color, backgroundColor: `${theme.color}10`, borderColor: `${theme.color}26` }}
+                          >
+                            <Icon size={11} strokeWidth={2.4} />
+                            {theme.label}
+                          </span>
+                        );
+                      })}
+                    </div>
+
                     <motion.button
                       whileHover={{ scale: 1.025, y: -1 }}
                       whileTap={{ scale: 0.985 }}

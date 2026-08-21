@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { parseLibraryFile } from "../lib/library-parser";
+import { EmptyState } from "../components/ui/EmptyState";
 import {
   addParsedLibraryItems,
   loadAppData,
@@ -622,11 +623,12 @@ export default function Library() {
                 </div>
               </div>
             ) : (
-              <div className="h-full flex flex-col items-center justify-center text-center text-qz-text-muted p-8">
-                <BookOpen size={30} className="mb-3.5 text-qz-light opacity-80" />
-                <div className="font-serif text-[20px] text-qz-primary mb-2">选择一份资料开启工作台</div>
-                <p className="text-[12px] max-w-sm leading-relaxed">请从左侧文档列表中挑选任意资料，右侧将立即为您构筑全屏宽域 AI 摘要分析与正文阅读工作台。</p>
-              </div>
+              <EmptyState
+                icon={BookOpen}
+                title="选择一份资料开启工作台"
+                description="请从左侧文档列表中挑选任意资料，右侧将立即为您构筑全屏宽域 AI 摘要分析与正文阅读工作台。"
+                dashed={false}
+              />
             )}
           </div>
           
