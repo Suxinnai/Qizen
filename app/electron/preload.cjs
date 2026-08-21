@@ -12,3 +12,7 @@ contextBridge.exposeInMainWorld("qizenSecrets", {
   delete: (key) => ipcRenderer.invoke("qizen:secret:delete", key),
 });
 
+contextBridge.exposeInMainWorld("qizenDatabase", {
+  status: () => ipcRenderer.invoke("qizen:db:status"),
+  importBundle: (bundle) => ipcRenderer.invoke("qizen:db:import-bundle", bundle),
+});

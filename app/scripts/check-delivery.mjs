@@ -8,9 +8,13 @@ function read(path) {
 }
 
 const files = {
+  app: read("src/App.tsx"),
   session: read("src/hooks/useStudySession.ts"),
   practice: read("src/hooks/useStudyPractice.ts"),
   conversationContext: read("src/lib/study/conversation-context.ts"),
+  sqliteShadowImport: read("src/lib/persistence/sqlite-shadow-import.ts"),
+  databaseIpc: read("electron/database-ipc.cjs"),
+  preload: read("electron/preload.cjs"),
   webAgent: read("src/lib/webResourceAgent.ts"),
   messageBody: read("src/components/study/MessageBody.tsx"),
   messageList: read("src/components/study/MessageList.tsx"),
@@ -76,6 +80,28 @@ const checks = [
       files.session.includes("query: modelQuery") &&
       files.conversationContext.includes("DEFAULT_HISTORY_CHAR_BUDGET") &&
       files.conversationContext.includes("buildContextualUserQuery"),
+  },
+  {
+    name: "SQLite bridge exposes only status and migration import capabilities",
+    pass:
+      files.databaseIpc.includes('ipcMain.handle("qizen:db:status"') &&
+      files.databaseIpc.includes('ipcMain.handle("qizen:db:import-bundle"') &&
+      !files.databaseIpc.includes("qizen:db:query") &&
+      !files.databaseIpc.includes("qizen:db:exec") &&
+      files.preload.includes('exposeInMainWorld("qizenDatabase"') &&
+      files.preload.includes("status:") &&
+      files.preload.includes("importBundle:") &&
+      !files.preload.includes("rawSql"),
+  },
+  {
+    name: "Electron startup performs guarded one-time SQLite shadow import",
+    pass:
+      files.app.includes("ensureSqliteShadowImport") &&
+      files.app.includes("qizen-appdata-change") &&
+      files.sqliteShadowImport.includes("hasMeaningfulLocalData") &&
+      files.sqliteShadowImport.includes("buildSqliteMigrationBundle") &&
+      files.sqliteShadowImport.includes('kind: "already-imported"') &&
+      files.sqliteShadowImport.includes('kind: "empty"'),
   },
   {
     name: "resource panel exposes live/local/fallback status",

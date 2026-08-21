@@ -2,6 +2,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { app, BrowserWindow, ipcMain, safeStorage, shell } = require("electron");
+const { registerDatabaseIpc, closeDatabaseIpc } = require("./database-ipc.cjs");
 
 const DEV_URL = process.env.QIZEN_ELECTRON_DEV_URL;
 const isSmokeTest = process.argv.includes("--smoke-test");
@@ -237,6 +238,7 @@ async function runVisualSmoke() {
 }
 
 registerIpc();
+registerDatabaseIpc();
 
 app.whenReady().then(() => {
   if (isSmokeTest) {
@@ -266,6 +268,10 @@ app.whenReady().then(() => {
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+});
+
+app.on("before-quit", () => {
+  closeDatabaseIpc();
 });
 
 app.on("window-all-closed", () => {
